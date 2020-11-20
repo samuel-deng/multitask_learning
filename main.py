@@ -18,7 +18,7 @@ if __name__ == "__main__":
     eta = 0.1
     eps = 0.1
     lambd = 0.1
-    B = grad_descent(R, X, Y, T, eta, eps, lambd)
+    B = grad_descent(R, X, Y, T, eta, eps, lambd) # Works! Gets stuck at around ~0.3 loss
 
     # Tensor decomposition
 

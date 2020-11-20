@@ -73,18 +73,20 @@ def gradient(R, cov_X_list, B, lambd):
     gradient = (2 * float(1/len(R))) * gradient
 
     # Regularizer
+    original_shape = B.shape
+    avg_reg = np.zeros(original_shape)
     for mode in range(B.ndim):
         unfolded_B = tl.unfold(B, mode) # matrix
-        print(unfolded_B.shape)
-        U, _, V_T = svd(unfolded_B)
-        D_mode = U * V_T
-        print(D_mode.shape)
+        U, _, V_T = svd(unfolded_B, full_matrices=False)
+        D_mode = np.matmul(U, V_T)
+        folded_D = tl.fold(D_mode, mode, original_shape)
+        avg_reg += folded_D
+    
+    reg_term = avg_reg/float(B.ndim) * lambd # avg. over the three unfoldings
 
-    # Take SVD of each unfolding of B (3 of them)
-    # Take UV^T of each unfolding 
-    # Convert UV^T for each unfolding to a tensor (from d1 x d2T => d1 x d2 x T)
-
-    return gradient
+    # Gradient is sum of gradient and reg_term
+    final_grad = gradient + reg_term
+    return final_grad
 
 def grad_descent(R, X, Y, T, eta, eps, lambd):
     # Initialize B to a random tensor d1 x d2 x T
@@ -95,15 +97,16 @@ def grad_descent(R, X, Y, T, eta, eps, lambd):
     for i in range(len(X)):
         cov_X_list.append(generate_covariate_X(X[i], Y[i], i, T)) # Y[i] is only if t is the identity function (should really be Y[t(i)])
 
-    print(objective(R, cov_X_list, B, lambd))
     print(gradient(R, cov_X_list, B, lambd).shape)
     
     # Main gradient descent loop
-    #while objective(R, cov_X_list, B, lambd) > eps:
+    while objective(R, cov_X_list, B, lambd) > eps: 
+        print(objective(R, cov_X_list, B, lambd))
+
         # Calculate gradient
-    #    grad = gradient(R, cov_X_list, B, lambd)
+        grad = gradient(R, cov_X_list, B, lambd)
 
         # Update B
-    #    B = B - eta * grad
+        B = B - eta * grad
 
     return B
