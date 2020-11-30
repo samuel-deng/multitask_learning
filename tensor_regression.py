@@ -88,17 +88,17 @@ def gradient(R, cov_X_list, B, lambd, task_function):
     final_grad = gradient + reg_term
     return final_grad
 
-def grad_descent(R, X, Y, T, eta, eps, lambd, task_function):
+def grad_descent(A, R, X, Y, T, eta, eps, lambd, task_function):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
+    # B = np.zeros((X.shape[1], Y.shape[1], T))
 
-    # Precompute the covariate tensors for each x
+    # Precompute the covariate tensors for each X (N total)
     cov_X_list = []
     for i in range(len(X)):
         cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
 
-    print(gradient(R, cov_X_list, B, lambd, task_function).shape)
-    
+    print(gradient(R, cov_X_list, B, lambd, task_function).shape)   
     # Main gradient descent loop
     while objective(R, cov_X_list, B, lambd, task_function) > eps: 
         print(objective(R, cov_X_list, B, lambd, task_function))

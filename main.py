@@ -6,9 +6,9 @@ if __name__ == "__main__":
     # Dataset parameters
     d1 = 100
     d2 = 100
-    d3 = 100
+    d3 = 10
     N = 100
-    T = 100
+    T = 50
     r = 3
 
     # Generate dataset
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     eta = 0.1
     eps = 0.1
     lambd = 0.1
-    B = grad_descent(R, X, Y, T, eta, eps, lambd, task_function) # Works! Gets stuck at around ~0.3 loss
+    B = grad_descent(A, R, X, Y, T, eta, eps, lambd, task_function) # Works! Gets stuck at around ~0.3 loss
 
     # Tensor decomposition
 
