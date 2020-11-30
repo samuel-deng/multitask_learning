@@ -43,11 +43,11 @@ where ||B||_S is the Schatten-1 Norm of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Objective function value (float)
 '''
-def objective(R, cov_X_list, B, lambd):
+def objective(R, cov_X_list, B, lambd, task_function):
     # Main sum
     cost = 0
     for i in range(len(R)): # for i = 1...N
-        cost += (R[i][i] - inner(B, cov_X_list[i])) ** 2
+        cost += (R[i][task_function[i]] - inner(B, cov_X_list[i])) ** 2
     cost = float(1/len(R)) * cost # 1/N sum [(R_i - <X_i, B>)^2]
 
     # Regularizer
@@ -65,11 +65,11 @@ where that last term is achieved by 3 SVD's, one on each mode of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Gradient Tensor (d1 x d2 x T)
 '''
-def gradient(R, cov_X_list, B, lambd):
+def gradient(R, cov_X_list, B, lambd, task_function):
     # Main sum
     gradient = np.zeros(B.shape) # d1 x d2 x T
     for i in range(len(R)):
-        gradient += (R[i][i] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
+        gradient += (R[i][task_function[i]] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
     gradient = (2 * float(1/len(R))) * gradient
 
     # Regularizer
@@ -88,23 +88,23 @@ def gradient(R, cov_X_list, B, lambd):
     final_grad = gradient + reg_term
     return final_grad
 
-def grad_descent(R, X, Y, T, eta, eps, lambd):
+def grad_descent(R, X, Y, T, eta, eps, lambd, task_function):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
 
     # Precompute the covariate tensors for each x
     cov_X_list = []
     for i in range(len(X)):
-        cov_X_list.append(generate_covariate_X(X[i], Y[i], i, T)) # Y[i] is only if t is the identity function (should really be Y[t(i)])
+        cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
 
-    print(gradient(R, cov_X_list, B, lambd).shape)
+    print(gradient(R, cov_X_list, B, lambd, task_function).shape)
     
     # Main gradient descent loop
-    while objective(R, cov_X_list, B, lambd) > eps: 
-        print(objective(R, cov_X_list, B, lambd))
+    while objective(R, cov_X_list, B, lambd, task_function) > eps: 
+        print(objective(R, cov_X_list, B, lambd, task_function))
 
         # Calculate gradient
-        grad = gradient(R, cov_X_list, B, lambd)
+        grad = gradient(R, cov_X_list, B, lambd, task_function)
 
         # Update B
         B = B - eta * grad

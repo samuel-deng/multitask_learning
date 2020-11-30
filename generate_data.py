@@ -11,7 +11,6 @@ def generate_synthetic_data(d1, d2, d3, N, T, r):
     user_mu = 0
     user_sigma = 1 
     X = user_sigma * np.random.randn(N, d1) + user_mu # From N(0, 1)
-    print(X.shape)
 
     # Generate task feature vectors (Y, Z)
     Y_mu = 0
@@ -33,6 +32,12 @@ def generate_synthetic_data(d1, d2, d3, N, T, r):
     for n in range(N):
         for t in range(T):
             A_prod = multi_mode_dot(A, [X[n], Y[t], Z[t]])
-            R[n][t] = A_prod + noise[n][t]            
+            R[n][t] = A_prod + noise[n][t] 
 
-    return X, Y, Z, A, R
+    # Task function t(i)
+    # Assign each user with a task uniformly at random
+    task_function = dict()
+    for i in range(N):
+        task_function[i] = i
+
+    return X, Y, Z, A, R, task_function
