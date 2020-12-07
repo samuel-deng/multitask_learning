@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 from tensorly.tenalg import mode_dot
 from tensorly.tenalg import inner
 from tensorly.tenalg import multi_mode_dot
@@ -71,3 +72,23 @@ def A_Z_prod(A, Z, i, j, t):
         cum_sum += A[i][j][k] * Z[t][k]
 
     return cum_sum
+
+if __name__ == "__main__":
+    # Dataset parameters
+    d1 = 100
+    d2 = 100
+    d3 = 100
+    N = 2500
+    T = 100
+    r = 3
+
+    # Generate synthetic data
+    X, Y, Z, A, R, task_function = generate_synthetic_data(d1, d2, d3, N, T, r)
+
+    # Pickle the data to run tensor regression on
+    pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
+    pickle.dump(Y, open("synthetic_data/Y.pkl", "wb"))
+    pickle.dump(Z, open("synthetic_data/Z.pkl", "wb"))
+    pickle.dump(A, open("synthetic_data/A.pkl", "wb"))
+    pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
+    pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))

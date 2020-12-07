@@ -98,10 +98,12 @@ def grad_descent(A, R, X, Y, T, eta, eps, lambd, task_function):
     for i in range(len(X)):
         cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
 
-    print(gradient(R, cov_X_list, B, lambd, task_function).shape)   
+    past_objective = 0
+
     # Main gradient descent loop
-    while objective(R, cov_X_list, B, lambd, task_function) > eps: 
-        print(objective(R, cov_X_list, B, lambd, task_function))
+    while np.abs(objective(R, cov_X_list, B, lambd, task_function) - past_objective) > eps: 
+        past_objective = objective(R, cov_X_list, B, lambd, task_function)
+        print(past_objective)
 
         # Calculate gradient
         grad = gradient(R, cov_X_list, B, lambd, task_function)
