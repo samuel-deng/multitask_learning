@@ -55,8 +55,9 @@ def generate_synthetic_data(d1, d2, d3, N, T, r):
     for i in range(len(X)):
         cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
 
-    assert( np.abs(inner(cov_X_list[1], A_test) + noise[1][task_function[1]] - R[1][task_function[1]]) < 1e-6 ) # Check A(I_d, I_d2, Z) dot X gives back R_i
-    return X, Y, Z, A, R, task_function
+    for i in range(len(X)):
+        assert( np.abs(inner(cov_X_list[i], A_test) + noise[i][task_function[i]] - R[i][task_function[i]]) < 1e-6 ) # Check A(I_d, I_d2, Z) dot X gives back R_i
+    return X, Y, Z, A, R, task_function, cov_X_list, A_test
 
 # For testing
 def generate_covariate_X(x, y, t, T):
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     r = 3
 
     # Generate synthetic data
-    X, Y, Z, A, R, task_function = generate_synthetic_data(d1, d2, d3, N, T, r)
+    X, Y, Z, A, R, task_function, cov_X_list, A_test = generate_synthetic_data(d1, d2, d3, N, T, r)
 
     # Pickle the data to run tensor regression on
     pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
@@ -92,3 +93,5 @@ if __name__ == "__main__":
     pickle.dump(A, open("synthetic_data/A.pkl", "wb"))
     pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
     pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))
+    pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
+    pickle.dump(A_test, open("synthetic_data/true_B.pkl", "wb"))

@@ -1,7 +1,11 @@
 import numpy as np
 import pickle
 from generate_data import generate_synthetic_data
-from tensor_regression import generate_covariate_X, grad_descent
+from tensor_regression import generate_covariate_X, grad_descent, batch_grad_descent
+import tensorly as tl
+from tensorly.decomposition import parafac
+from numpy.linalg import svd
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Dataset parameters
@@ -25,14 +29,36 @@ if __name__ == "__main__":
     R = pickle.load(open("synthetic_data/R.pkl", "rb"))
     Y = pickle.load(open("synthetic_data/Y.pkl", "rb"))
     Z = pickle.load(open("synthetic_data/Z.pkl", "rb"))
+    true_B = pickle.load(open("synthetic_data/true_B.pkl", "rb")) # A(I, I, Z), the true value B needs to estimate
     task_function = pickle.load(open("synthetic_data/task_function.pkl", "rb"))
+    cov_X_list = pickle.load(open("synthetic_data/cov_X_list.pkl", "rb"))
 
-    # Tensor regression
-    eta = 0.1
+    # Step 1: Tensor regression
+    eta = 0.01
     eps = 0.1
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B = grad_descent(A, R, X, Y, T, eta, eps, lambd, task_function) # Works! Gets stuck at around ~0.3 loss
+    B, error_list = batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function)
+    pickle.dump(B, open("B.pkl", "wb"))
+    pickle.dump(error_list, open("errors.pkl", "wb"))
+    B = pickle.load(open("B.pkl", "rb"))
+    print("Distance from true B: {}".format(tl.norm(B - true_B)))
 
-    # Tensor decomposition
+    # Plot tensor regression loss over iters
+    #plt.plot(error_list)
+    #plt.title("Tensor Regression Cost")
+    #plt.xlabel("Number of iterations")
+    #plt.ylabel("Cost")
+    #plt.show()
 
+    # Step 2: Tensor decomposition
+    weights, factors = parafac(B, r)
+    B_1 = factors[0]
+    B_2 = factors[1]
+    B_3 = factors[2]
+
+    # Step 3: SVD of B_3
+    U, D, V_T = svd(B_3, full_matrices=False)
+
+    # Step 4: Extract A and Z
+    Z = U @ np.diag(D)
