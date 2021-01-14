@@ -12,14 +12,14 @@ def outer(*vs):
 def generate_synthetic_data(d1, d2, d3, N, T, r):
     # Generate user feature vectors (X)
     user_mu = 0
-    user_sigma = 1 
+    user_sigma = 1/np.sqrt(d1)
     X = user_sigma * np.random.randn(N, d1) + user_mu # From N(0, 1)
 
     # Generate task feature vectors (Y, Z)
     Y_mu = 0
-    Y_sigma = 1
+    Y_sigma = 1/np.sqrt(d2)
     Z_mu = 0
-    Z_sigma = 1
+    Z_sigma = 1/np.sqrt(d3)
     Y = Y_sigma * np.random.randn(T, d2) + Y_mu
     Z = Z_sigma * np.random.randn(T, d3) + Z_mu
 

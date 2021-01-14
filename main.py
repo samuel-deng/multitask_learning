@@ -4,6 +4,7 @@ from generate_data import generate_synthetic_data
 from tensor_regression import generate_covariate_X, grad_descent, batch_grad_descent
 import tensorly as tl
 from tensorly.decomposition import parafac
+from tensorly.tenalg import inner
 from numpy.linalg import svd
 import matplotlib.pyplot as plt
 
@@ -34,15 +35,21 @@ if __name__ == "__main__":
     cov_X_list = pickle.load(open("synthetic_data/cov_X_list.pkl", "rb"))
 
     # Step 1: Tensor regression
-    eta = 0.01
+    eta = 0.1
     eps = 0.1
+    iterations = 50
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B, error_list = batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function)
+    B, error_list = batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, iterations)
     pickle.dump(B, open("B.pkl", "wb"))
     pickle.dump(error_list, open("errors.pkl", "wb"))
     B = pickle.load(open("B.pkl", "rb"))
     print("Distance from true B: {}".format(tl.norm(B - true_B)))
+    print(tl.norm(B - true_B)/tl.norm(true_B))
+    #print("Frobenius Norm from true B: {}".format(np.sqrt(inner((B - true_B), (B - true_B))) / np.sqrt(inner(true_B, true_B)) )
+    random_B = np.random.randn(X.shape[1], Y.shape[1], T)
+    #print("Frobenius Norm (random B): {}".format(np.sqrt(inner((random_B - true_B), (random_B - true_B))) / np.sqrt(inner(true_B, true_B)))
+    print(tl.norm(true_B - random_B) / tl.norm(true_B))
 
     # Plot tensor regression loss over iters
     #plt.plot(error_list)
@@ -56,9 +63,13 @@ if __name__ == "__main__":
     B_1 = factors[0]
     B_2 = factors[1]
     B_3 = factors[2]
+    print(weights)
+    print(B_1.shape)
+    print(B_2.shape)
+    print(B_3.shape)
 
     # Step 3: SVD of B_3
     U, D, V_T = svd(B_3, full_matrices=False)
 
     # Step 4: Extract A and Z
-    Z = U @ np.diag(D)
+    Z = U @ np.diag(D)    
