@@ -2,7 +2,7 @@ import numpy as np
 import argparse
 import pickle
 from generate_data import generate_synthetic_data
-from tensor_regression import generate_covariate_X, grad_descent, batch_grad_descent
+from tensor_regression import generate_covariate_X, batch_grad_descent
 import tensorly as tl
 from tensorly.decomposition import parafac
 from tensorly.tenalg import inner
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     if args.iters:
         iterations = int(args.iters)
     else:
-        iters = 50
+        iterations = 50
 
     # D1 for the lambda parameter
     D1 = np.sqrt(d1) + np.sqrt(d2) + np.sqrt(T) + np.sqrt(d1 * T) + np.sqrt(d2 * T) + np.sqrt(d1 * d2)
@@ -79,15 +79,15 @@ if __name__ == "__main__":
     true_B = pickle.load(open("synthetic_data/true_B.pkl", "rb")) # A(I, I, Z), the true value B needs to estimate
     task_function = pickle.load(open("synthetic_data/task_function.pkl", "rb"))
     cov_X_list = pickle.load(open("synthetic_data/cov_X_list.pkl", "rb"))
+    cov_X = pickle.load(open("synthetic_data/cov_X.pkl", "rb"))
 
     # Step 1: Tensor regression
     eta = 0.1
     eps = 0.1
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B, error_list = batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, iterations)
+    B = batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_function, iterations)
     pickle.dump(B, open(DIR_PREFIX + "B_T{}.pkl".format(T), "wb"))
-    pickle.dump(error_list, open("errors.pkl", "wb"))
     B = pickle.load(open(DIR_PREFIX + "B_T{}.pkl".format(T), "rb"))
     print("Distance from true B: {}".format(tl.norm(B - true_B)/tl.norm(true_B)))
 
@@ -101,10 +101,11 @@ if __name__ == "__main__":
     U, D, V_T = svd(B_3, full_matrices=False)
 
     # Step 4: Extract A and Z
-    Z = U @ np.diag(D)
-    print("Estimated Z shape: {}".format(Z.shape))
-    pickle.dump(Z, open(DIR_PREFIX + "Z_hat_T{}.pkl".format(T), "wb"))
+    est_Z = U @ np.diag(D)
+    print("Estimated Z shape: {}".format(est_Z.shape))
+    pickle.dump(est_Z, open(DIR_PREFIX + "Z_hat_T{}.pkl".format(T), "wb"))
     factors[2] = V_T
-    A = cp_to_tensor((weights, factors))
-    print("Estimated A shape: {}".format(A.shape))
+    est_A = cp_to_tensor((weights, factors))
+    print("Estimated A shape: {}".format(est_A.shape))
     pickle.dump(A, open(DIR_PREFIX + "A_hat_T{}.pkl".format(T), "wb"))
+    print("Distance from true A: {}".format(tl.norm(est_A - A)/tl.norm(A)))

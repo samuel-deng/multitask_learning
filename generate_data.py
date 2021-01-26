@@ -66,15 +66,17 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
 
     # Find the true B ( <A(I, I, Z), X_i> ) that we'll estimate with tensor regression
     true_B = mode_dot(A, Z, mode=2)
-    # print(Y[task_function].shape)
 
     cov_X_list = []
     for i in range(len(X)):
-        cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
+        cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T))
+
+    Y_ti = Y[task_function]
+    cov_X = np.einsum('bi,bo->bio', X, Y_ti)
 
     #for i in range(len(X)):
     #    assert( np.abs(inner(cov_X_list[i], A_test) + noise[i][task_function[i]] - R_test[i][task_function[i]]) < 1e-6 ) # Check A(I_d, I_d2, Z) dot X gives back R_i
-    return X, Y, Z, A, R, task_function, cov_X_list, true_B
+    return X, Y, Z, A, R, task_function, cov_X_list, cov_X, true_B
 
 # For testing
 def generate_covariate_X(x, y, t, T):
@@ -84,12 +86,12 @@ def generate_covariate_X(x, y, t, T):
     return cov_X
 
 # For testing
-def A_Z_prod(A, Z, i, j, t):
-    cum_sum = 0
-    for k in range(A.shape[2]):
-        cum_sum += A[i][j][k] * Z[t][k]
+#def A_Z_prod(A, Z, i, j, t):
+#    cum_sum = 0
+#    for k in range(A.shape[2]):
+#        cum_sum += A[i][j][k] * Z[t][k]
 
-    return cum_sum
+#    return cum_sum
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -135,7 +137,7 @@ if __name__ == "__main__":
         sigma = 0.1
 
     # Generate synthetic data
-    X, Y, Z, A, R, task_function, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
+    X, Y, Z, A, R, task_function, cov_X_list, cov_X, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # Pickle the data to run tensor regression on
     pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
@@ -145,6 +147,7 @@ if __name__ == "__main__":
     pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
     pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))
     pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
+    pickle.dump(cov_X, open("synthetic_data/cov_X.pkl", "wb"))
     pickle.dump(true_B, open("synthetic_data/true_B.pkl", "wb"))
     end = time.time()
     print("Time to generate data: {}".format(end - start))

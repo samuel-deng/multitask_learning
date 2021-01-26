@@ -44,11 +44,19 @@ where ||B||_S is the Schatten-1 Norm of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Objective function value (float)
 '''
-def objective(R, cov_X_list, B, lambd, task_function, batch):
-    # Main sum
-    cost = 0
-    for i in batch:
-        cost += (R[i][task_function[i]] - inner(B, cov_X_list[i])) ** 2 # tensor inner product
+def objective(R, cov_X_list, cov_X, B, lambd, task_function, batch):
+    # Pre-index into R with the task function to get an 1 x N array
+    R_indexed = R[np.arange(len(R)), task_function]
+    B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
+    inner_X_B = np.multiply(cov_X, B_indexed)
+    inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)  
+    cost = np.sum(np.square(R_indexed - inner_X_B_summed))
+
+    # Unoptimized for loop (DEPRECATED)
+    #cost = 0
+    #for i in batch:
+    #    cost += (R[i][task_function[i]] - inner(B, cov_X_list[i])) ** 2 # tensor inner product
+
     cost = float(1/len(batch)) * cost # 1/N sum [(R_i - <X_i, B>)^2]
 
     # Regularizer
@@ -66,11 +74,23 @@ where that last term is achieved by 3 SVD's, one on each mode of B, and D_(i) = 
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Gradient Tensor (d1 x d2 x T)
 '''
-def gradient(R, cov_X_list, B, lambd, task_function, batch):
+def gradient(R, cov_X_list, cov_X, B, lambd, task_function, batch):
+    # New and improved
+    gradient = np.zeros(B.shape)
+    R_indexed = R[np.arange(len(R)), task_function]
+    B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
+    inner_X_B = np.multiply(cov_X, B_indexed)
+    inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)  
+    cost = R_indexed - inner_X_B_summed
+    summand = cost.reshape((-1,) + (1,)*(cov_X.ndim - 1)) * (-1 * cov_X)
+    for i in batch:
+        gradient[:, :, task_function[i]] += summand[i]
+
     # Main sum
-    gradient = np.zeros(B.shape) # d1 x d2 x T
-    for i in batch: # full gradient (over all N users)
-        gradient += (R[i][task_function[i]] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
+    #gradient = np.zeros(B.shape) # d1 x d2 x T
+    #for i in batch: # full gradient (over all N users)
+    #    gradient += (R[i][task_function[i]] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
+
     gradient = float(2/len(batch)) * gradient
 
     # Gradient of Regularizer
@@ -88,6 +108,42 @@ def gradient(R, cov_X_list, B, lambd, task_function, batch):
     final_grad = gradient + reg_term
     return final_grad
 
+def batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_function, iterations=100):
+    # Initialize B to a random tensor d1 x d2 x T
+    B = np.random.randn(X.shape[1], Y.shape[1], T)
+    error_list = []
+    batch = list(range(len(R)))
+    # B = np.zeros((X.shape[1], Y.shape[1], T))
+
+    # Main gradient descent loop
+    past_objective = 0
+    prev_obj_delta = 1e15
+    for iteration in range(iterations):
+        start = time.time()
+        # Calculate cost
+        curr_objective = objective(R, cov_X_list, cov_X, B, lambd, task_function, batch)
+
+        # Stopping condition 
+        current_obj_delta = np.abs(curr_objective - past_objective)
+        if(np.abs(current_obj_delta - prev_obj_delta) < eps):
+            return B
+        past_objective = curr_objective
+        prev_obj_delta = current_obj_delta
+        print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
+        error_list.append(curr_objective)
+
+        # Calculate gradient
+        # Full batch gradient descent
+        grad = gradient(R, cov_X_list, cov_X, B, lambd, task_function, batch)
+        
+        # Update B
+        B = B - eta * grad
+        end = time.time()
+        # print("Time per iteration: {}".format(end - start))
+
+    return B
+
+'''
 def grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, batch_size=32, iterations=20):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
@@ -107,43 +163,9 @@ def grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, batc
 
     return B, error_list
 
-def batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, iterations=100):
-    # Initialize B to a random tensor d1 x d2 x T
-    B = np.random.randn(X.shape[1], Y.shape[1], T)
-    error_list = []
-    batch = list(range(len(R)))
-    # B = np.zeros((X.shape[1], Y.shape[1], T))
-
-    # Main gradient descent loop
-    past_objective = 0
-    prev_obj_delta = 1e15
-    for iteration in range(iterations):
-        start = time.time()
-        # Calculate cost
-        curr_objective = objective(R, cov_X_list, B, lambd, task_function, batch)
-
-        # Stopping condition 
-        current_obj_delta = np.abs(curr_objective - past_objective)
-        if(np.abs(current_obj_delta - prev_obj_delta) < eps):
-            return B
-        past_objective = curr_objective
-        prev_obj_delta = current_obj_delta
-        print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
-        error_list.append(curr_objective)
-
-        # Calculate gradient
-        # Full batch gradient descent
-        grad = gradient(R, cov_X_list, B, lambd, task_function, batch)
-        
-        # Update B
-        B = B - eta * grad
-        end = time.time()
-        print("Time per iteration: {}".format(end - start))
-
-    return B, error_list
-
 def create_mini_batches(num_examples, batch_size):
     examples = list(range(num_examples))
     np.random.shuffle(examples)
     for i in range(0, len(examples), batch_size):
         yield examples[i:i + batch_size]
+'''
