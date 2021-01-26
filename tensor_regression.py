@@ -116,26 +116,29 @@ def batch_grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function
 
     # Main gradient descent loop
     past_objective = 0
+    prev_obj_delta = 1e15
     for iteration in range(iterations):
+        start = time.time()
         # Calculate cost
         curr_objective = objective(R, cov_X_list, B, lambd, task_function, batch)
 
         # Stopping condition 
-        if(np.abs(curr_objective - past_objective) < eps):
+        current_obj_delta = np.abs(curr_objective - past_objective)
+        if(np.abs(current_obj_delta - prev_obj_delta) < eps):
             return B
         past_objective = curr_objective
+        prev_obj_delta = current_obj_delta
         print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
         error_list.append(curr_objective)
 
         # Calculate gradient
         # Full batch gradient descent
-        start = time.time()
         grad = gradient(R, cov_X_list, B, lambd, task_function, batch)
-        end = time.time()
-        print("Time to calculate gradient: {}".format(end - start))
         
         # Update B
         B = B - eta * grad
+        end = time.time()
+        print("Time per iteration: {}".format(end - start))
 
     return B, error_list
 

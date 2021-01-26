@@ -1,15 +1,21 @@
 import numpy as np
 import pickle
+import argparse
+import time
 from tensorly.tenalg import mode_dot
 from tensorly.tenalg import inner
 from tensorly.tenalg import multi_mode_dot
+from tensorly.cp_tensor import cp_to_tensor
 from tensorly.random import random_cp
 from functools import reduce
 
 def outer(*vs):
     return reduce(np.multiply.outer, vs)
 
-def generate_synthetic_data(d1, d2, d3, N, T, r):
+def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
+    # Seed the randomness
+    np.random.seed(42)
+
     # Generate user feature vectors (X)
     user_mu = 0
     user_sigma = 1/np.sqrt(d1)
@@ -24,40 +30,51 @@ def generate_synthetic_data(d1, d2, d3, N, T, r):
     Z = Z_sigma * np.random.randn(T, d3) + Z_mu
 
     # Generate Gaussian noise
-    noise_mu, noise_sigma = 0, 0.1
+    noise_mu, noise_sigma = 0, sigma
     noise = np.random.normal(noise_mu, noise_sigma, (N, T))
 
     # Generate underlying tensor (A), rank r
-    A = random_cp((d1, d2, d3), full=True, rank=r, orthogonal=True)
+    (_, factors) = random_cp((d1, d2, d3), full=False, rank=r, orthogonal=True, normalise_factors=True)
+    weights = np.random.uniform(low=1.0, high=10.0, size=(r))
+    A = cp_to_tensor((weights, factors))    
 
     # Generate responses
-    R = np.zeros((N, T))
-    for n in range(N):
-        for t in range(T):
-            A_prod = multi_mode_dot(A, [X[n], Y[t], Z[t]])
-            R[n][t] = A_prod + noise[n][t] 
+    #R_test = np.zeros((N, T))
+    #for n in range(N):
+    #    for t in range(T):
+    #        A_prod = multi_mode_dot(A, [X[n], Y[t], Z[t]])
+    #        R_test[n][t] = A_prod + noise[n][t] 
+
+    # Generate responses
+    start = time.time()
+    R = [multi_mode_dot(mode_dot(A, X, mode=0), [Y[t], Z[t]], modes=[1, 2]) for t in range(T)]
+    R = np.asarray(R).T + noise
+    end = time.time()
+    print("Time to generate responses: {}".format(end - start))
 
     # Task function t(i)
     # Assign each user with a task uniformly at random
-    task_function = dict()
-    for i in range(N):
-        task_function[i] = np.random.randint(0, T)
+    task_function = np.random.randint(0, T, size=N)
 
     # TEST: Make sure <A(I, I, Z), X_i> + eps_i == R_{i, t(i)}
     # A(I_d1, I_d2, Z), just to check if generate_covariate_X is working okay
-    A_test = np.zeros((d1, d2, T))
-    for i in range(d1):
-        for j in range(d2):
-            for t in range(T):
-                A_test[i][j][t] = A_Z_prod(A, Z, i, j, t)
+    #A_test = np.zeros((d1, d2, T))
+    #for i in range(d1):
+    #    for j in range(d2):
+    #        for t in range(T):
+    #            A_test[i][j][t] = A_Z_prod(A, Z, i, j, t)
+
+    # Find the true B ( <A(I, I, Z), X_i> ) that we'll estimate with tensor regression
+    true_B = mode_dot(A, Z, mode=2)
+    # print(Y[task_function].shape)
 
     cov_X_list = []
     for i in range(len(X)):
         cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T)) 
 
-    for i in range(len(X)):
-        assert( np.abs(inner(cov_X_list[i], A_test) + noise[i][task_function[i]] - R[i][task_function[i]]) < 1e-6 ) # Check A(I_d, I_d2, Z) dot X gives back R_i
-    return X, Y, Z, A, R, task_function, cov_X_list, A_test
+    #for i in range(len(X)):
+    #    assert( np.abs(inner(cov_X_list[i], A_test) + noise[i][task_function[i]] - R_test[i][task_function[i]]) < 1e-6 ) # Check A(I_d, I_d2, Z) dot X gives back R_i
+    return X, Y, Z, A, R, task_function, cov_X_list, true_B
 
 # For testing
 def generate_covariate_X(x, y, t, T):
@@ -75,16 +92,50 @@ def A_Z_prod(A, Z, i, j, t):
     return cum_sum
 
 if __name__ == "__main__":
-    # Dataset parameters
-    d1 = 100
-    d2 = 100
-    d3 = 100
-    N = 2500
-    T = 100
-    r = 3
+    # Parse arguments from command line
+    start = time.time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--d1", help="First dimension (d1).")
+    parser.add_argument("--d2", help="Second dimension (d2).")
+    parser.add_argument("--d3", help="Third dimension (d3).")
+    parser.add_argument("--N", help= "Number of users/examples (N).")
+    parser.add_argument("--T", help="Number of tasks (T).")
+    parser.add_argument("--r", help="CP Rank of the underlying tensor A.")
+    parser.add_argument("--sigma", help="Std. dev. of the noise.")
+
+    # Parse args (otherwise set defaults)
+    args = parser.parse_args()
+    if args.d1:
+        d1 = int(args.d1)
+    else:
+        d1 = 100
+    if args.d2:
+        d2 = int(args.d2)
+    else:
+        d2 = 50
+    if args.d3:
+        d3 = int(args.d3)
+    else:
+        d3 = 10
+    if args.N:
+        N = int(args.N)
+    else:
+        N = 2500
+    if args.T:
+        T = int(args.T)
+    else:
+        T = 100
+    if args.r:
+        r = int(args.r)
+    else:
+        r = 10
+    if args.sigma:
+        sigma = float(args.sigma)
+    else:
+        sigma = 0.1
 
     # Generate synthetic data
-    X, Y, Z, A, R, task_function, cov_X_list, A_test = generate_synthetic_data(d1, d2, d3, N, T, r)
+    X, Y, Z, A, R, task_function, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # Pickle the data to run tensor regression on
     pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
@@ -94,4 +145,6 @@ if __name__ == "__main__":
     pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
     pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))
     pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
-    pickle.dump(A_test, open("synthetic_data/true_B.pkl", "wb"))
+    pickle.dump(true_B, open("synthetic_data/true_B.pkl", "wb"))
+    end = time.time()
+    print("Time to generate data: {}".format(end - start))
