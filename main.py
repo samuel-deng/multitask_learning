@@ -21,6 +21,8 @@ if __name__ == "__main__":
     parser.add_argument("--r", help="CP Rank of the underlying tensor A.")
     parser.add_argument("--sigma", help="Std. dev. of the noise.")
     parser.add_argument("--iters", help="Number of iterations for grad. desc.")
+    parser.add_argument('--load_data', dest='load_data', action='store_true')
+    parser.set_defaults(load_data=False)
 
     # Parse args (otherwise set defaults)
     args = parser.parse_args()
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     if args.d3:
         d3 = int(args.d3)
     else:
-        d3 = 5
+        d3 = 10
     if args.N:
         N = int(args.N)
     else:
@@ -55,41 +57,44 @@ if __name__ == "__main__":
     if args.iters:
         iterations = int(args.iters)
     else:
-        iterations = 50
+        iterations = 200
+
+    load_data = args.load_data
 
     # D1 for the lambda parameter
     D1 = np.sqrt(d1) + np.sqrt(d2) + np.sqrt(T) + np.sqrt(d1 * T) + np.sqrt(d2 * T) + np.sqrt(d1 * d2)
 
     # Generate dataset
-    # X, Y, Z, A, R, task_function = generate_synthetic_data(d1, d2, d3, N, T, r)
+    if (load_data):
+        A = pickle.load(open("synthetic_data/A.pkl", "rb"))
+        X = pickle.load(open("synthetic_data/X.pkl", "rb"))
+        R = pickle.load(open("synthetic_data/R.pkl", "rb"))
+        Y = pickle.load(open("synthetic_data/Y.pkl", "rb"))
+        Z = pickle.load(open("synthetic_data/Z.pkl", "rb"))
+        true_B = pickle.load(open("synthetic_data/true_B.pkl", "rb")) # A(I, I, Z), the true value B needs to estimate
+        task_function = pickle.load(open("synthetic_data/task_function.pkl", "rb"))
+        cov_X = pickle.load(open("synthetic_data/cov_X.pkl", "rb"))
+    else:
+        X, Y, Z, A, R, task_function, cov_X, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # PREFIX: Setup prefix for the directory where we save the resultant data
     DIR_PREFIX = "result_data/T_{}/".format(T)
-
-    # Load already generate data
-    A = pickle.load(open("synthetic_data/A.pkl", "rb"))
     print("Original A shape: {}".format(A.shape))
     pickle.dump(A, open(DIR_PREFIX + "A_T{}.pkl".format(T), "wb"))
-    X = pickle.load(open("synthetic_data/X.pkl", "rb"))
-    R = pickle.load(open("synthetic_data/R.pkl", "rb"))
-    Y = pickle.load(open("synthetic_data/Y.pkl", "rb"))
-    Z = pickle.load(open("synthetic_data/Z.pkl", "rb"))
     print("Original Z shape: {}".format(Z.shape))
     pickle.dump(Z, open(DIR_PREFIX + "Z_T{}.pkl".format(T), "wb"))
-    true_B = pickle.load(open("synthetic_data/true_B.pkl", "rb")) # A(I, I, Z), the true value B needs to estimate
-    task_function = pickle.load(open("synthetic_data/task_function.pkl", "rb"))
-    cov_X_list = pickle.load(open("synthetic_data/cov_X_list.pkl", "rb"))
-    cov_X = pickle.load(open("synthetic_data/cov_X.pkl", "rb"))
 
     # Step 1: Tensor regression
     eta = 0.1
     eps = 0.1
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B = batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_function, iterations)
+    B = batch_grad_descent(A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations)
     pickle.dump(B, open(DIR_PREFIX + "B_T{}.pkl".format(T), "wb"))
     B = pickle.load(open(DIR_PREFIX + "B_T{}.pkl".format(T), "rb"))
     print("Distance from true B: {}".format(tl.norm(B - true_B)/tl.norm(true_B)))
+    random_B = np.random.randn(X.shape[1], Y.shape[1], T)
+    print("Distance from random B: {}".format(tl.norm(random_B - true_B)/tl.norm(true_B)))
 
     # Step 2: Tensor decomposition
     weights, factors = parafac(B, r)
@@ -109,3 +114,5 @@ if __name__ == "__main__":
     print("Estimated A shape: {}".format(est_A.shape))
     pickle.dump(A, open(DIR_PREFIX + "A_hat_T{}.pkl".format(T), "wb"))
     print("Distance from true A: {}".format(tl.norm(est_A - A)/tl.norm(A)))
+    random_A = np.random.randn(d1, d2, d3)
+    print("Distance from random A: {}".format(tl.norm(random_A - A)/tl.norm(A)))

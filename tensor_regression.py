@@ -44,7 +44,7 @@ where ||B||_S is the Schatten-1 Norm of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Objective function value (float)
 '''
-def objective(R, cov_X_list, cov_X, B, lambd, task_function, batch):
+def objective(R, cov_X, B, lambd, task_function, batch):
     # Pre-index into R with the task function to get an 1 x N array
     R_indexed = R[np.arange(len(R)), task_function]
     B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
@@ -74,7 +74,7 @@ where that last term is achieved by 3 SVD's, one on each mode of B, and D_(i) = 
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Gradient Tensor (d1 x d2 x T)
 '''
-def gradient(R, cov_X_list, cov_X, B, lambd, task_function, batch):
+def gradient(R, cov_X, B, lambd, task_function, batch):
     # New and improved
     gradient = np.zeros(B.shape)
     R_indexed = R[np.arange(len(R)), task_function]
@@ -108,7 +108,7 @@ def gradient(R, cov_X_list, cov_X, B, lambd, task_function, batch):
     final_grad = gradient + reg_term
     return final_grad
 
-def batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_function, iterations=100):
+def batch_grad_descent(A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=100):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
     error_list = []
@@ -121,7 +121,7 @@ def batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_f
     for iteration in range(iterations):
         start = time.time()
         # Calculate cost
-        curr_objective = objective(R, cov_X_list, cov_X, B, lambd, task_function, batch)
+        curr_objective = objective(R, cov_X, B, lambd, task_function, batch)
 
         # Stopping condition 
         current_obj_delta = np.abs(curr_objective - past_objective)
@@ -134,7 +134,7 @@ def batch_grad_descent(A, R, X, Y, cov_X_list, cov_X, T, eta, eps, lambd, task_f
 
         # Calculate gradient
         # Full batch gradient descent
-        grad = gradient(R, cov_X_list, cov_X, B, lambd, task_function, batch)
+        grad = gradient(R, cov_X, B, lambd, task_function, batch)
         
         # Update B
         B = B - eta * grad
