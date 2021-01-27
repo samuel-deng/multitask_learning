@@ -44,13 +44,9 @@ where ||B||_S is the Schatten-1 Norm of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Objective function value (float)
 '''
-def objective(R, cov_X, B, lambd, task_function, batch):
-    # Pre-index into R with the task function to get an 1 x N array
-    R_indexed = R[np.arange(len(R)), task_function]
-    B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
-    inner_X_B = np.multiply(cov_X, B_indexed)
-    inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)  
-    cost = np.sum(np.square(R_indexed - inner_X_B_summed))
+def objective(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
+    # The inner products have already been precalculated in inner_X_B
+    cost = np.sum(np.square(R_indexed - inner_X_B))
 
     # Unoptimized for loop (DEPRECATED)
     #cost = 0
@@ -74,14 +70,10 @@ where that last term is achieved by 3 SVD's, one on each mode of B, and D_(i) = 
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Gradient Tensor (d1 x d2 x T)
 '''
-def gradient(R, cov_X, B, lambd, task_function, batch):
-    # New and improved
+def gradient(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
+    # New and improved  
     gradient = np.zeros(B.shape)
-    R_indexed = R[np.arange(len(R)), task_function]
-    B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
-    inner_X_B = np.multiply(cov_X, B_indexed)
-    inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)  
-    cost = R_indexed - inner_X_B_summed
+    cost = R_indexed - inner_X_B
     summand = cost.reshape((-1,) + (1,)*(cov_X.ndim - 1)) * (-1 * cov_X)
     for i in batch:
         gradient[:, :, task_function[i]] += summand[i]
@@ -108,7 +100,7 @@ def gradient(R, cov_X, B, lambd, task_function, batch):
     final_grad = gradient + reg_term
     return final_grad
 
-def batch_grad_descent(A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=100):
+def batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=200):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
     error_list = []
@@ -117,31 +109,54 @@ def batch_grad_descent(A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, ite
 
     # Main gradient descent loop
     past_objective = 0
-    prev_obj_delta = 1e15
+    prev_obj_delta = 0
     for iteration in range(iterations):
-        start = time.time()
+        # start = time.time()
+        
+        # Precalculate indexing R by task function and the inner products <X_i, B>
+        R_indexed = R[np.arange(len(R)), task_function]
+        inner_X_B = calculate_inner_X_B(cov_X, B, task_function)
+
         # Calculate cost
-        curr_objective = objective(R, cov_X, B, lambd, task_function, batch)
+        curr_objective = objective(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch)
+        true_objective = objective(R_indexed, cov_X, true_B, inner_X_B, lambd, task_function, batch)
 
         # Stopping condition 
-        current_obj_delta = np.abs(curr_objective - past_objective)
-        if(np.abs(current_obj_delta - prev_obj_delta) < eps):
+        current_obj_delta = np.abs(past_objective - curr_objective)
+        stopping_condition = 1e10              # Don't stop 
+        if(stopping_condition < eps):
             return B
         past_objective = curr_objective
         prev_obj_delta = current_obj_delta
-        print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
+        if (iteration + 1) % 10 == 0:
+            print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
+        if (iteration + 1) % 10 == 0:
+            print("Cost on iteration {}: {}".format(iteration + 1, true_objective))
+        
         error_list.append(curr_objective)
 
         # Calculate gradient
         # Full batch gradient descent
-        grad = gradient(R, cov_X, B, lambd, task_function, batch)
+        grad = gradient(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch)
+        
+        # Cut down eta
+        if (iteration + 1) % 25 == 0:
+            eta = eta/2
         
         # Update B
         B = B - eta * grad
-        end = time.time()
+        
+        # end = time.time()
         # print("Time per iteration: {}".format(end - start))
 
     return B
+
+# Calculates the inner product of each X_i and B
+def calculate_inner_X_B(cov_X, B, task_function):
+    B_indexed = np.moveaxis(B[:, :, task_function], -1, 0)
+    inner_X_B = np.multiply(cov_X, B_indexed)
+    inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)
+    return inner_X_B_summed
 
 '''
 def grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, batch_size=32, iterations=20):

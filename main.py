@@ -9,6 +9,15 @@ from tensorly.tenalg import inner
 from tensorly.cp_tensor import cp_to_tensor
 from numpy.linalg import svd
 import matplotlib.pyplot as plt
+from numpy.linalg import norm
+
+def schatten1_norm(B):
+    total_norm = 0
+    for mode in range(B.ndim):
+        total_norm += np.linalg.norm(tl.unfold(B, mode), 'nuc')
+
+    total_norm = (1/B.ndim) * total_norm
+    return total_norm
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -86,15 +95,16 @@ if __name__ == "__main__":
 
     # Step 1: Tensor regression
     eta = 0.1
-    eps = 0.1
+    eps = 0.01
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B = batch_grad_descent(A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations)
+    B = batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=100)
     pickle.dump(B, open(DIR_PREFIX + "B_T{}.pkl".format(T), "wb"))
     B = pickle.load(open(DIR_PREFIX + "B_T{}.pkl".format(T), "rb"))
-    print("Distance from true B: {}".format(tl.norm(B - true_B)/tl.norm(true_B)))
-    random_B = np.random.randn(X.shape[1], Y.shape[1], T)
-    print("Distance from random B: {}".format(tl.norm(random_B - true_B)/tl.norm(true_B)))
+    print("Norm for true B: {}".format(tl.norm(true_B)))
+    print("Distance from true B: {}".format(tl.norm(B - true_B)))
+    #random_B = np.random.randn(X.shape[1], Y.shape[1], T)
+    #print("Distance from random B: {}".format(tl.norm(random_B - true_B)/tl.norm(true_B)))
 
     # Step 2: Tensor decomposition
     weights, factors = parafac(B, r)
@@ -112,7 +122,5 @@ if __name__ == "__main__":
     factors[2] = V_T
     est_A = cp_to_tensor((weights, factors))
     print("Estimated A shape: {}".format(est_A.shape))
-    pickle.dump(A, open(DIR_PREFIX + "A_hat_T{}.pkl".format(T), "wb"))
+    pickle.dump(est_A, open(DIR_PREFIX + "A_hat_T{}.pkl".format(T), "wb"))
     print("Distance from true A: {}".format(tl.norm(est_A - A)/tl.norm(A)))
-    random_A = np.random.randn(d1, d2, d3)
-    print("Distance from random A: {}".format(tl.norm(random_A - A)/tl.norm(A)))
