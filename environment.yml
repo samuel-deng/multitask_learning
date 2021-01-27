@@ -1,0 +1,8 @@
+name: multitask_learning
+channels:
+  - defaults
+dependencies:
+  - tensorly
+  - pylint
+  - matplotlib
+prefix: /opt/miniconda3/envs/multitask_learning
