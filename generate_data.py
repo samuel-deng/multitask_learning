@@ -52,18 +52,23 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
     # Find the true B ( <A(I, I, Z), X_i> ) that we'll estimate with tensor regression
     true_B = mode_dot(A, Z, mode=2)
 
+    # Generate cov_X_list of actual covariate X tensors
+    cov_X_list = []
+    for i in range(N):
+        cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T))
+
     # Generate covariate_X (not the full sparse tensor, just the slices)
+    # cov_X[i] is equiv. to the t(i) slice of the i'th covariate X_i tensor
     Y_ti = Y[task_function]
     cov_X = np.einsum('bi,bo->bio', X, Y_ti)
-
-    return X, Y, Z, A, R, task_function, cov_X, true_B
+    return X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B
 
 # For testing
-#def generate_covariate_X(x, y, t, T):
-#    outer = np.outer(x, y)
-#    cov_X = np.zeros((len(x), len(y), T)) # d1 x d2 x T
-#    cov_X[:,:, t] = outer
-#    return cov_X
+def generate_covariate_X(x, y, t, T):
+    outer = np.outer(x, y)
+    cov_X = np.zeros((len(x), len(y), T)) # d1 x d2 x T
+    cov_X[:,:, t] = outer
+    return cov_X
 
 # For testing
 #def A_Z_prod(A, Z, i, j, t):
@@ -117,7 +122,7 @@ if __name__ == "__main__":
         sigma = 0.1
 
     # Generate synthetic data
-    X, Y, Z, A, R, task_function, cov_X, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
+    X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # Pickle the data to run tensor regression on
     pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
@@ -127,6 +132,7 @@ if __name__ == "__main__":
     pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
     pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))
     pickle.dump(cov_X, open("synthetic_data/cov_X.pkl", "wb"))
+    pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
     pickle.dump(true_B, open("synthetic_data/true_B.pkl", "wb"))
     end = time.time()
     print("Time to generate data: {}".format(end - start))

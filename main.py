@@ -83,8 +83,9 @@ if __name__ == "__main__":
         true_B = pickle.load(open("synthetic_data/true_B.pkl", "rb")) # A(I, I, Z), the true value B needs to estimate
         task_function = pickle.load(open("synthetic_data/task_function.pkl", "rb"))
         cov_X = pickle.load(open("synthetic_data/cov_X.pkl", "rb"))
+        cov_X_list = pickle.load(open("synthetic_data/cov_X_list.pkl", "rb"))
     else:
-        X, Y, Z, A, R, task_function, cov_X, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
+        X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # PREFIX: Setup prefix for the directory where we save the resultant data
     DIR_PREFIX = "result_data/T_{}/".format(T)
@@ -98,9 +99,9 @@ if __name__ == "__main__":
     eps = 0.01
     lambd = (40 * sigma * D1)/np.sqrt(N)
     print("lambda hyperparam = {}".format(lambd))
-    B = batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=100)
+    B = batch_grad_descent(true_B, A, R, X, Y, cov_X, cov_X_list, T, eta, eps, lambd, task_function, iterations)
     pickle.dump(B, open(DIR_PREFIX + "B_T{}.pkl".format(T), "wb"))
-    B = pickle.load(open(DIR_PREFIX + "B_T{}.pkl".format(T), "rb"))
+    print("Norm for recovered B: {}".format(tl.norm(B)))
     print("Norm for true B: {}".format(tl.norm(true_B)))
     print("Distance from true B: {}".format(tl.norm(B - true_B)))
     #random_B = np.random.randn(X.shape[1], Y.shape[1], T)

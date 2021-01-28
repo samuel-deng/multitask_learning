@@ -44,14 +44,15 @@ where ||B||_S is the Schatten-1 Norm of B.
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Objective function value (float)
 '''
-def objective(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
+def objective(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch):
     # The inner products have already been precalculated in inner_X_B
     cost = np.sum(np.square(R_indexed - inner_X_B))
 
-    # Unoptimized for loop (DEPRECATED)
-    #cost = 0
+    # Unoptimized for loop (UNCOMMENT TO DEBUG)
+    #cost_test = 0
     #for i in batch:
-    #    cost += (R[i][task_function[i]] - inner(B, cov_X_list[i])) ** 2 # tensor inner product
+    #    cost_test += (R[i][task_function[i]] - inner(B, cov_X_list[i])) ** 2 # tensor inner product
+    #print(np.allclose(cost, cost_test))
 
     cost = float(1/len(batch)) * cost # 1/N sum [(R_i - <X_i, B>)^2]
 
@@ -70,18 +71,21 @@ where that last term is achieved by 3 SVD's, one on each mode of B, and D_(i) = 
 Input: R (N x T matrix), cov_X_list (list of N d1xd2xT tensors), B (d1 x d2 x T tensor), lambd (float)
 Output: Gradient Tensor (d1 x d2 x T)
 '''
-def gradient(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
+def gradient(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch):
     # New and improved  
     gradient = np.zeros(B.shape)
+    # The inner products have already been calculated in inner_X_B
     cost = R_indexed - inner_X_B
+    # Contains the inner term of the summation for each i in n
     summand = cost.reshape((-1,) + (1,)*(cov_X.ndim - 1)) * (-1 * cov_X)
     for i in batch:
         gradient[:, :, task_function[i]] += summand[i]
 
-    # Main sum
-    #gradient = np.zeros(B.shape) # d1 x d2 x T
+    # Main sum (UNCOMMENT TO DEBUG)
+    #gradient_test = np.zeros(B.shape) # d1 x d2 x T
     #for i in batch: # full gradient (over all N users)
-    #    gradient += (R[i][task_function[i]] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
+    #    gradient_test += (R[i][task_function[i]] - inner(cov_X_list[i], B)) * (-1 * cov_X_list[i])
+    #print(np.allclose(gradient, gradient_test))
 
     gradient = float(2/len(batch)) * gradient
 
@@ -94,13 +98,13 @@ def gradient(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
         D_mode = np.matmul(U, V_T)
         folded_D = tl.fold(D_mode, mode, original_shape)
         avg_reg += folded_D
-    reg_term = avg_reg/float(B.ndim) * lambd # avg. over the three unfoldings
+    reg_term = (avg_reg/float(B.ndim)) * lambd # avg. over the three unfoldings
 
     # Gradient is sum of gradient and reg_term
     final_grad = gradient + reg_term
     return final_grad
 
-def batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_function, iterations=200):
+def batch_grad_descent(true_B, A, R, X, Y, cov_X, cov_X_list, T, eta, eps, lambd, task_function, iterations=200):
     # Initialize B to a random tensor d1 x d2 x T
     B = np.random.randn(X.shape[1], Y.shape[1], T)
     error_list = []
@@ -118,8 +122,9 @@ def batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_funct
         inner_X_B = calculate_inner_X_B(cov_X, B, task_function)
 
         # Calculate cost
-        curr_objective = objective(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch)
-        true_objective = objective(R_indexed, cov_X, true_B, inner_X_B, lambd, task_function, batch)
+        curr_objective = objective(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch)
+        #inner_X_B = calculate_inner_X_B(cov_X, true_B, task_function)
+        #true_objective = objective(R_indexed, cov_X, true_B, inner_X_B, lambd, task_function, batch)
 
         # Stopping condition 
         current_obj_delta = np.abs(past_objective - curr_objective)
@@ -130,16 +135,16 @@ def batch_grad_descent(true_B, A, R, X, Y, cov_X, T, eta, eps, lambd, task_funct
         prev_obj_delta = current_obj_delta
         if (iteration + 1) % 10 == 0:
             print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
-        if (iteration + 1) % 10 == 0:
-            print("Cost on iteration {}: {}".format(iteration + 1, true_objective))
+        #if (iteration + 1) % 10 == 0:
+        #    print("Cost on iteration {}: {}".format(iteration + 1, true_objective))
         
         error_list.append(curr_objective)
 
         # Calculate gradient
         # Full batch gradient descent
-        grad = gradient(R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch)
+        grad = gradient(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch)
         
-        # Cut down eta
+        # Cut down eta every 25 iterations
         if (iteration + 1) % 25 == 0:
             eta = eta/2
         
@@ -157,30 +162,3 @@ def calculate_inner_X_B(cov_X, B, task_function):
     inner_X_B = np.multiply(cov_X, B_indexed)
     inner_X_B_summed = inner_X_B.reshape(inner_X_B.shape[0],-1).sum(axis=1)
     return inner_X_B_summed
-
-'''
-def grad_descent(A, R, X, Y, cov_X_list, T, eta, eps, lambd, task_function, batch_size=32, iterations=20):
-    # Initialize B to a random tensor d1 x d2 x T
-    B = np.random.randn(X.shape[1], Y.shape[1], T)
-    error_list = []
-    # B = np.zeros((X.shape[1], Y.shape[1], T))
-
-    # Main gradient descent loop
-    for iteration in range(iterations):
-        # Mini-batch gradient descent
-        batched_examples = list(create_mini_batches(len(R), batch_size))
-        for batch in batched_examples:
-            grad = gradient(R, cov_X_list, B, lambd, task_function, batch)
-            B = B - eta * grad
-            cost = objective(R, cov_X_list, B, lambd, task_function, batch)
-            print("Cost on iteration {}: {}".format(iteration + 1, cost))
-            error_list.append(cost)
-
-    return B, error_list
-
-def create_mini_batches(num_examples, batch_size):
-    examples = list(range(num_examples))
-    np.random.shuffle(examples)
-    for i in range(0, len(examples), batch_size):
-        yield examples[i:i + batch_size]
-'''
