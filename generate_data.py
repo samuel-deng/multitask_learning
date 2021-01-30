@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 import argparse
 import time
+from tensorly import norm
 from tensorly.tenalg import mode_dot
 from tensorly.tenalg import inner
 from tensorly.tenalg import multi_mode_dot
@@ -13,6 +14,7 @@ def outer(*vs):
     return reduce(np.multiply.outer, vs)
 
 def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
+    start = time.time()
     # Seed the randomness
     np.random.seed(42)
 
@@ -20,6 +22,7 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
     user_mu = 0
     user_sigma = 1/np.sqrt(d1)
     X = user_sigma * np.random.randn(N, d1) + user_mu # From N(0, 1)
+    print("Norm of X: {}".format(norm(X)))
 
     # Generate task feature vectors (Y, Z)
     Y_mu = 0
@@ -28,6 +31,8 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
     Z_sigma = 1/np.sqrt(d3)
     Y = Y_sigma * np.random.randn(T, d2) + Y_mu
     Z = Z_sigma * np.random.randn(T, d3) + Z_mu
+    print("Norm of Y: {}".format(norm(Y)))
+    print("Norm of Z: {}".format(norm(Z)))
 
     # Generate Gaussian noise
     noise_mu, noise_sigma = 0, sigma
@@ -37,13 +42,11 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
     (_, factors) = random_cp((d1, d2, d3), full=False, rank=r, orthogonal=True, normalise_factors=True)
     weights = np.random.uniform(low=1.0, high=10.0, size=(r))
     A = cp_to_tensor((weights, factors))    
+    print("Norm of A: {}".format(norm(A)))
 
     # Generate responses
-    start = time.time()
     R = [multi_mode_dot(mode_dot(A, X, mode=0), [Y[t], Z[t]], modes=[1, 2]) for t in range(T)]
     R = np.asarray(R).T + noise
-    end = time.time()
-    print("Time to generate responses: {}".format(end - start))
 
     # Task function t(i)
     # Assign each user with a task uniformly at random
@@ -53,22 +56,25 @@ def generate_synthetic_data(d1, d2, d3, N, T, r, sigma):
     true_B = mode_dot(A, Z, mode=2)
 
     # Generate cov_X_list of actual covariate X tensors
-    cov_X_list = []
-    for i in range(N):
-        cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T))
+    #cov_X_list = []
+    #for i in range(N):
+    #    cov_X_list.append(generate_covariate_X(X[i], Y[task_function[i]], task_function[i], T))
 
     # Generate covariate_X (not the full sparse tensor, just the slices)
     # cov_X[i] is equiv. to the t(i) slice of the i'th covariate X_i tensor
     Y_ti = Y[task_function]
     cov_X = np.einsum('bi,bo->bio', X, Y_ti)
-    return X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B
+    # return X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B
+    end = time.time()
+    print("Time to generate data: {}".format(end - start))
+    return X, Y, Z, A, R, task_function, cov_X, true_B
 
 # For testing
-def generate_covariate_X(x, y, t, T):
-    outer = np.outer(x, y)
-    cov_X = np.zeros((len(x), len(y), T)) # d1 x d2 x T
-    cov_X[:,:, t] = outer
-    return cov_X
+#def generate_covariate_X(x, y, t, T):
+#    outer = np.outer(x, y)
+#    cov_X = np.zeros((len(x), len(y), T)) # d1 x d2 x T
+#    cov_X[:,:, t] = outer
+#    return cov_X
 
 # For testing
 #def A_Z_prod(A, Z, i, j, t):
@@ -103,7 +109,7 @@ if __name__ == "__main__":
     if args.d3:
         d3 = int(args.d3)
     else:
-        d3 = 10
+        d3 = 50
     if args.N:
         N = int(args.N)
     else:
@@ -119,10 +125,11 @@ if __name__ == "__main__":
     if args.sigma:
         sigma = float(args.sigma)
     else:
-        sigma = 0.1
+        sigma = 1.0
 
     # Generate synthetic data
-    X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
+    X, Y, Z, A, R, task_function, cov_X, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
+    #X, Y, Z, A, R, task_function, cov_X, cov_X_list, true_B = generate_synthetic_data(d1, d2, d3, N, T, r, sigma)
 
     # Pickle the data to run tensor regression on
     pickle.dump(X, open("synthetic_data/X.pkl", "wb"))
@@ -132,7 +139,7 @@ if __name__ == "__main__":
     pickle.dump(R, open("synthetic_data/R.pkl", "wb"))
     pickle.dump(task_function, open("synthetic_data/task_function.pkl", "wb"))
     pickle.dump(cov_X, open("synthetic_data/cov_X.pkl", "wb"))
-    pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
+    # pickle.dump(cov_X_list, open("synthetic_data/cov_X_list.pkl", "wb"))
     pickle.dump(true_B, open("synthetic_data/true_B.pkl", "wb"))
     end = time.time()
     print("Time to generate data: {}".format(end - start))
