@@ -11,7 +11,7 @@ from numpy.linalg import svd
 import matplotlib.pyplot as plt
 from numpy.linalg import norm
 
-def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations, output_dir):
+def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations):
     # Save the original A and Z tensors
     # Step 1: Tensor regression
     print("lambda hyperparam = {}".format(lambd))
@@ -19,6 +19,7 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
 
     # Step 2: Tensor decomposition
     weights, factors = parafac(B, r)
+    print(len(factors))
     B_1 = factors[0]
     B_2 = factors[1]
     B_3 = factors[2]
@@ -29,6 +30,7 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
     true_B_3 = factors[2]
 
     # Step 3: SVD of B_3
+    d3 = Z.shape[1]
     if r > d3:
         U, D, V_T = svd(B_3, full_matrices=False)
     else:
@@ -39,10 +41,11 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
         D = D[:r]
         V_T = V_T[:r, :] 
 
+
     # Step 4: Extract A
     factors[2] = V_T.T
     est_A = cp_to_tensor((weights, factors))
-    return B, est_A
+    return B, est_A 
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -129,7 +132,7 @@ if __name__ == "__main__":
 
     # Run algorithm 1 (saves everything to .pkl within the function)
     eps = 0.01
-    B, est_A = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations, output_dir)
+    B, est_A = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
 
     # Save the results from algorithm 1 to pickle
     print("Original A shape: {}".format(A.shape))
