@@ -136,17 +136,26 @@ if __name__ == "__main__":
     # Need to get W from A to perform least squares
     est_Z0 = least_squares(est_A, X, Y0, R, r)
 
+    # Now, generate 500 test instances to compare MSE
+    # Generate user feature vectors X
+    user_mu = 0
+    user_sigma = 1/np.sqrt(d1)
+    X_test = user_sigma * np.random.randn(500, d1) + user_mu # From N(0, 1/sqrt(d1))
+
     # Find avg. error over all X
-    est_R = multi_mode_dot(mode_dot(est_A, X, mode=0), [Y0, est_Z0], modes=[1,2])
-    MSE = np.sum(np.square(R - est_R))
+    true_R = multi_mode_dot(mode_dot(A, X_test, mode=0), [Y0, Z0], modes=[1,2])
+    est_R = multi_mode_dot(mode_dot(est_A, X_test, mode=0), [Y0, est_Z0], modes=[1,2])
+    MSE = np.sum(np.square(true_R - est_R))
     MSE = MSE / X.shape[0]
 
     # Save the necessary tensors and matrices to find MSE again and plot
-    pickle.dump(A, open(output_dir + "A_N2{}.pkl".format(N2), "wb"))
-    pickle.dump(est_A, open(output_dir + "A_hat_N2{}.pkl".format(N2), "wb"))
-    pickle.dump(X, open(output_dir + "X_test_N2{}.pkl".format(N2)))
-    pickle.dump(Y0, open(output_dir + "Y0_N2{}.pkl".format(N2), "wb"))
-    pickle.dump(est_Z0, open(output_dir + "est_Z0{}.pkl".format(N2), "wb"))
-    pickle.dump(R, open(output_dir + "R_N2{}.pkl".format(N2), "wb"))
-    pickle.dump(est_R, open(output_dir + "R_N2{}.pkl".format(N2), "wb"))
+    pickle.dump(A, open(output_dir + "A_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(est_A, open(output_dir + "A_hat_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(X, open(output_dir + "X_cal_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(X_test, open(output_dir + "X_test_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(Y0, open(output_dir + "Y0_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(Z0, open(output_dir + "Z0_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(est_Z0, open(output_dir + "Z0_hat_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(true_R, open(output_dir + "true_R_N2_{}.pkl".format(N2), "wb"))
+    pickle.dump(est_R, open(output_dir + "est_R_N2_{}.pkl".format(N2), "wb"))
 
