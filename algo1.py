@@ -41,7 +41,6 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
         D = D[:r]
         V_T = V_T[:r, :] 
 
-
     # Step 4: Extract A
     factors[2] = V_T.T
     est_A = cp_to_tensor((weights, factors))
