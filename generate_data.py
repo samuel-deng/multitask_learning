@@ -19,9 +19,7 @@ def generate_responses(A, X, Y, Z, T):
     return R
 
 # Only generates X, Y, Z data
-def generate_training_data(d1, d2, d3, N, T, seed=42):
-    # Seed the randomness
-    np.random.seed(seed)
+def generate_training_data(d1, d2, d3, N, T ):
 
     # Generate user feature vectors (X)
     user_mu = 0
@@ -38,30 +36,26 @@ def generate_training_data(d1, d2, d3, N, T, seed=42):
     return X, Y, Z
 
 # Only generates underlying system tensor (A), with rank r
-def generate_A_tensor(d1, d2, d3, r, seed=42):
-    # Seed the randomness
-    np.random.seed(seed)
+def generate_A_tensor(d1, d2, d3, r ):
 
     # Generate underlying tensor (A), rank r
     (_, factors) = random_cp((d1, d2, d3), full=False, rank=r, orthogonal=True, normalise_factors=True)
     weights = np.random.uniform(low=1.0, high=10.0, size=(r))
-    A = cp_to_tensor((weights, factors))    
+    A = cp_to_tensor((weights, factors))
     return A
 
-def generate_synthetic_data(d1, d2, d3, N, T, r, sigma, seed=42):
+def generate_synthetic_data(d1, d2, d3, N, T, r, sigma ):
     start = time.time()
-    # Seed the randomness
-    np.random.seed(seed)
 
     # Generate training data (X, Y, Z)
-    X, Y, Z = generate_training_data(d1, d2, d3, N, T, seed)
+    X, Y, Z = generate_training_data(d1, d2, d3, N, T )
 
     # Generate Gaussian noise
     noise_mu, noise_sigma = 0, sigma
     noise = np.random.normal(noise_mu, noise_sigma, (N, T))
 
     # Generate underlying tensor (A), rank r
-    A = generate_A_tensor(d1, d2, d3, r, seed) 
+    A = generate_A_tensor(d1, d2, d3, r )
 
     # Generate responses
     R = generate_responses(A, X, Y, Z, T)

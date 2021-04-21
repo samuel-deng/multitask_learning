@@ -22,7 +22,7 @@ def generate_covariate_X(x, y, t, T):
     return cov_X
 
 '''
-Takes a tensor B, and computes the Schatten-1 Norm of B 
+Takes a tensor B, and computes the Schatten-1 Norm of B
 (average of the nuclear norms of its modes).
 
 Input: B (d1 x d2 x T tensor)
@@ -69,7 +69,7 @@ def objective(R, R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
 '''
 Takes a response matrix R (N x T), a list of covariate X (N of them),
 and the current iteration's B and outputs the gradient tensor in d1 x d2 x T:
-    
+
     (2/N) sum_{i = 1}^N (R_{i, t(i)} - <X_i, B>) -X_i + (\lambd/3) * (D_(1) + D_(2) + D_(3))
 
 where that last term is achieved by 3 SVD's, one on each mode of B, and D_(i) = U_(i)V_(i)^T in the SVD.
@@ -79,7 +79,7 @@ Output: Gradient Tensor (d1 x d2 x T)
 '''
 # def gradient(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch):
 def gradient(R, R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
-    # New and improved  
+    # New and improved
     gradient = np.zeros(B.shape)
     # The inner products have already been calculated in inner_X_B
     cost = R_indexed - inner_X_B
@@ -114,11 +114,11 @@ def gradient(R, R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
     return final_grad
 
 # def batch_grad_descent(true_B, A, R, X, Y, cov_X, cov_X_list, T, eta, eps, lambd, task_function, iterations=200):
-def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations=200):
+def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations=200, sparse=1):
     # Initialize B to a random tensor d1 x d2 x T
     (_, factors) = random_cp((X.shape[1], Y.shape[1], Z.shape[1]), full=False, rank=r, orthogonal=True, normalise_factors=True)
     weights = np.random.uniform(low=1.0, high=10.0, size=(r))
-    random_tensor = cp_to_tensor((weights, factors))  
+    random_tensor = cp_to_tensor((weights, factors))
     Z_mu = 0
     Z_sigma = 1/np.sqrt(Z.shape[1])
     Z = Z_sigma * np.random.randn(T, Z.shape[1]) + Z_mu
@@ -134,7 +134,10 @@ def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task
     prev_obj_delta = 0
     for iteration in range(iterations):
         # Precalculate indexing R by task function and the inner products <X_i, B>
-        R_indexed = R[np.arange(len(R)), task_function]
+        if(sparse):
+            R_indexed = R
+        else:
+            R_indexed = R[np.arange(len(R)), task_function]
         inner_X_B = calculate_inner_X_B(cov_X, B, task_function)
 
         # Calculate cost
@@ -143,26 +146,26 @@ def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task
         inner_X_B = calculate_inner_X_B(cov_X, true_B, task_function)
         # true_objective = objective(R, R_indexed, cov_X, true_B, inner_X_B, lambd, task_function, batch)
 
-        # Stopping condition 
+        # Stopping condition
         current_obj_delta = np.abs(past_objective - curr_objective)
-        stopping_condition = 1e10              # Don't stop 
+        stopping_condition = 1e10              # Don't stop
         if(stopping_condition < eps):
             return B
         past_objective = curr_objective
         prev_obj_delta = current_obj_delta
-        
+
         # Calculate gradient
         # Full batch gradient descent
         # grad = gradient(R, R_indexed, cov_X, cov_X_list, B, inner_X_B, lambd, task_function, batch)
         grad = gradient(R, R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch)
-       
-        # Update B
-        B = B - eta * grad 
 
-        if (iteration + 1) % 10 == 0:
-            print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
-            print("Distance from true_B: {}".format(tl.norm(true_B - B)))
-       
+        # Update B
+        B = B - eta * grad
+
+       # if (iteration + 1) % 10 == 0:
+        #    print("Cost on iteration {}: {}".format(iteration + 1, curr_objective))
+         #   print("Distance from true_B: {}".format(tl.norm(true_B - B)/np.sqrt(B.shape[0]*B.shape[1]*B.shape[2])))
+
     return B
 
 # Calculates the inner product of each X_i and B

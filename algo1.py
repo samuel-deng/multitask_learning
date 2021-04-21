@@ -33,18 +33,21 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
     d3 = Z.shape[1]
     if r > d3:
         U, D, V_T = svd(B_3, full_matrices=False)
+        #take top-d3 SVD
     else:
-        concat_mat = np.concatenate((np.identity(r), np.zeros((r, d3 - r))), axis=1)
-        B_3_modified = B_3 @ concat_mat
-        U, D, V_T = svd(B_3_modified, full_matrices=False)
+        #concat_mat = np.concatenate((np.identity(r), np.zeros((r, d3 - r))), axis=1)
+        #B_3_modified = B_3 @ concat_mat
+        U, D, V_T = svd(B_3, full_matrices=False)
         U = U[:, :r]    # top-r SVD
         D = D[:r]
-        V_T = V_T[:r, :] 
+        V_T = V_T[:r, :]
+        V_T_modified = np.concatenate((V_T.T, np.zeros((d3-r,r))),axis=0)
+        V_T = V_T_modified.T
 
     # Step 4: Extract A
     factors[2] = V_T.T
     est_A = cp_to_tensor((weights, factors))
-    return B, est_A 
+    return B, est_A
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -193,7 +196,7 @@ if __name__ == "__main__":
 #        print("V_T shape: {}".format(V_T.shape))
 #        U = U[:, :r]    # top-r SVD
 #        D = D[:r]
-#        V_T = V_T[:r, :] 
+#        V_T = V_T[:r, :]
 #
 #    # Step 4: Extract A and Z
 #    est_Z = U @ np.diag(D)
