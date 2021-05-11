@@ -27,7 +27,9 @@ if __name__ == "__main__":
     parser.add_argument("--lambd", help="Value of hyperparameter lambda.")
     parser.add_argument('--eta', help="Eta (learning rate) parameter.")
     parser.add_argument('--seed', help="Seed for the randomness of data generation.")
-    parser.add_argument('--A_and_task_dir', help="Path for the underlying tensor A and Y0, Z0.")
+    parser.add_argument('--load_data', help="Path for the underlying data.")
+    parser.add_argument('--save_data', help="Specify where you would like to save the data.")
+    parser.add_argument('--estimated_data', help="Specify where to put the estimates (A_1 and A_2).")
 
     # Parse args (otherwise set defaults)
     args = parser.parse_args()
@@ -71,21 +73,56 @@ if __name__ == "__main__":
         eta = float(args.eta)
     else:
         eta = 0.1
-    if args.A_and_task_dir:
-        A_and_task_dir = args.A_and_task_dir
-    else:
-        A_and_task_dir = "meta_test_results/persistent/"
     if args.seed:
         seed = args.seed
     else:
         seed = 42
+    #if args.A_and_task_dir:
+    #    A_and_task_dir = args.A_and_task_dir
+    #else:
+    #    A_and_task_dir = "meta_test_results/persistent/"
+    if args.load_data:
+        A = pickle.load(open(args.load_data + "A.pkl", "rb"))
+        X = pickle.load(open(args.load_data + "X.pkl", "rb"))
+        Y = pickle.load(open(args.load_data + "Y.pkl", "rb"))
+        Z = pickle.load(open(args.load_data + "Z.pkl", "rb"))   # NOTE: the contents of Z are never actually used, only shape
+        R = pickle.load(open(args.load_data + "R.pkl", "rb"))
+        task_function = pickle.load(open(args.load_data + "task_function.pkl", "rb"))
+    else:
+        print("Generating synthetic data...")
+        # Generate A tensor
+        A = generate_A_tensor(d1, d2, d3, r)
 
-    A = pickle.load(open(A_and_task_dir + "A.pkl", "rb"))
-    X = pickle.load(open(A_and_task_dir + "X.pkl", "rb"))
-    Y = pickle.load(open(A_and_task_dir + "Y.pkl", "rb"))
-    Z = pickle.load(open(A_and_task_dir + "Z.pkl", "rb"))
-    R = pickle.load(open(A_and_task_dir + "R.pkl", "rb"))
-    task_function = pickle.load(open(A_and_task_dir + "task_function.pkl", "rb"))
+        # Generate synthetic training data
+        X, Y, Z = generate_training_data(d1, d2, d3, N, T)
+        noise = np.random.normal(0, 1, (N, T))
+        R = generate_responses(A, X, Y, Z, T)
+        R += noise
+        task_function = np.random.randint(0, T, size=N)
+    if args.save_data:
+        save_data = args.save_data
+    else:
+        save_data = False
+    if args.estimated_data:
+        estimated_data = args.estimated_data
+    else:
+        estimated_data = "estimated_data/"
+
+    # ALGO 1
+    #print("Executing Algorithm 1...")
+    #true_B = mode_dot(A, Z, mode=2)
+    #Y_ti = Y[task_function]
+    #cov_X = np.einsum('bi,bo->bio', X, Y_ti)
+
+    # Perform algorithm 1 to get estimated A
+    #eps = 0.01
+    #B, est_A1 = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+
+    #save est_A
+    #pickle.dump(est_A1, open(estimated_data + "est_A1.pkl", "wb"))
+
+    # ALGO 2
+    #print("Executing Algorithm 2...")
     #N,_ = X.shape
     #_,d3 = Z.shape
     #Ri = [R[i][task_function[i]] for i in range(N)]
@@ -93,29 +130,13 @@ if __name__ == "__main__":
     #print(tl.norm(est_A2-A)/tl.norm(A))
 
     #save est_A2
-    #pickle.dump(est_A2, open(A_and_task_dir + "est_A2.pkl", "wb"))
-    # Generate A tensor
-    #A = generate_A_tensor(d1, d2, d3, r)
-    # Generate synthetic training data
-    #X, Y, Z = generate_training_data(d1, d2, d3, N, T)
-    #noise = np.random.normal(0, 1, (N, T))
-    #R = generate_responses(A, X, Y, Z, T)
-    #print("R shape = {}".format(R.shape))
-    #R += noise
-    #task_function = np.random.randint(0, T, size=N)
-    true_B = mode_dot(A, Z, mode=2)
-    Y_ti = Y[task_function]
-    cov_X = np.einsum('bi,bo->bio', X, Y_ti)
-
-    # Perform algorithm 1 to get estimated A
-    eps = 0.01
-    B, est_A = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+    #pickle.dump(est_A2, open(estimated_data + "est_A2.pkl", "wb"))
 
     # Save A, est_A, X, Y, Z, task_function, and R
-    #pickle.dump(A, open(A_and_task_dir + "A.pkl", "wb"))
-    pickle.dump(est_A, open(A_and_task_dir + "est_A.pkl", "wb"))
-    #pickle.dump(X, open(A_and_task_dir + "X.pkl", "wb"))
-    #pickle.dump(Y, open(A_and_task_dir + "Y.pkl", "wb"))
-    #pickle.dump(Z, open(A_and_task_dir + "Z.pkl", "wb"))
-    #pickle.dump(R, open(A_and_task_dir + "R.pkl", "wb"))
-    #pickle.dump(task_function, open(A_and_task_dir + "task_function.pkl", "wb"))
+    if (save_data):
+        pickle.dump(A, open(save_data + "A.pkl", "wb"))
+        pickle.dump(X, open(save_data + "X.pkl", "wb"))
+        pickle.dump(Y, open(save_data + "Y.pkl", "wb"))
+        pickle.dump(Z, open(save_data + "Z.pkl", "wb"))
+        pickle.dump(R, open(save_data + "R.pkl", "wb"))
+        pickle.dump(task_function, open(save_data + "task_function.pkl", "wb"))

@@ -114,8 +114,9 @@ def gradient(R, R_indexed, cov_X, B, inner_X_B, lambd, task_function, batch):
     return final_grad
 
 # def batch_grad_descent(true_B, A, R, X, Y, cov_X, cov_X_list, T, eta, eps, lambd, task_function, iterations=200):
-def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations=200, sparse=1):
+def batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations=200, sparse=0):
     # Initialize B to a random tensor d1 x d2 x T
+    # TODO: Z is ONLY used for the shape!
     (_, factors) = random_cp((X.shape[1], Y.shape[1], Z.shape[1]), full=False, rank=r, orthogonal=True, normalise_factors=True)
     weights = np.random.uniform(low=1.0, high=10.0, size=(r))
     random_tensor = cp_to_tensor((weights, factors))

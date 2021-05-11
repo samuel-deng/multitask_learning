@@ -73,11 +73,11 @@ if __name__ == '__main__':
     if args.output_dir:
         output_dir = args.output_dir
     else:
-        output_dir = "./"
+        output_dir = "meta_test_results/all_trials/"
     if args.A_and_task_dir:
         A_and_task_dir = args.A_and_task_dir
     else:
-        A_and_task_dir = "./persistent/"
+        A_and_task_dir = "meta_test_results/persistent/"
     if args.seed:
         seed = int(args.seed)
     else:

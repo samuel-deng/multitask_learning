@@ -30,8 +30,8 @@ def algo2(R, X, Y, task_function, r, d3, A):
 
     #use estimates A1 and A2 to get an estimate of A3
     M = np.zeros((d3, d3))
-    print(A2.shape)
-    print(A1.shape)
+    #print(A2.shape)
+    #print(A1.shape)
     krprod = kr((A2, A1))
     for i in range(N):
         P = np.kron(Y[task_function[i]], X[i]) @ krprod
@@ -39,13 +39,13 @@ def algo2(R, X, Y, task_function, r, d3, A):
     B, D, B1 = svd(M, full_matrices=False)
     A3 = B[:, :r]
     W = np.sqrt(D[:r])*np.sqrt(d3)
-    print(D[:r])
+    #print(D[:r])
 
     est_A = cp_to_tensor((W, [A1, A2, A3]))
-    print(est_A.shape)
+    #print(est_A.shape)
     weights, factors = parafac(A,r)
-    print(tl.norm(factors[0]-A1)/ tl.norm(A1))
-    print(tl.norm(factors[1]-A2)/ tl.norm(A2))
-    print(tl.norm(factors[2]-A3)/ tl.norm(A3))
+    #print(tl.norm(factors[0]-A1)/ tl.norm(A1))
+    #print(tl.norm(factors[1]-A2)/ tl.norm(A2))
+    #print(tl.norm(factors[2]-A3)/ tl.norm(A3))
     return est_A
 
