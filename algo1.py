@@ -15,7 +15,7 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
     # Save the original A and Z tensors
     # Step 1: Tensor regression
     print("lambda hyperparam = {}".format(lambd))
-    B = batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+    B = batch_grad_descent(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations, sparse=1)
 
     # Step 2: Tensor decomposition
     weights, factors = parafac(B, r)
@@ -29,6 +29,9 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
     true_B_2 = factors[1]
     true_B_3 = factors[2]
 
+    print(tl.norm(B_1 - true_B_1)/tl.norm(true_B_1))
+    print(tl.norm(B_2 - true_B_2)/tl.norm(true_B_2))
+
     # Step 3: SVD of B_3
     d3 = Z.shape[1]
     if r > d3:
@@ -37,6 +40,7 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
     else:
         #concat_mat = np.concatenate((np.identity(r), np.zeros((r, d3 - r))), axis=1)
         #B_3_modified = B_3 @ concat_mat
+        B_3_modified = np.matmul(B_3, np.diag(weights))
         U, D, V_T = svd(B_3, full_matrices=False)
         U = U[:, :r]    # top-r SVD
         D = D[:r]
@@ -46,8 +50,10 @@ def algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, it
 
     # Step 4: Extract A
     factors[2] = V_T.T
+    weights = np.ones(r)
     est_A = cp_to_tensor((weights, factors))
-    return B, est_A
+    # Return estimates of A^1 and A^2
+    return B, B_1, B_2
 
 if __name__ == "__main__":
     # Parse arguments from command line

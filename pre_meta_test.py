@@ -27,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--lambd", help="Value of hyperparameter lambda.")
     parser.add_argument('--eta', help="Eta (learning rate) parameter.")
     parser.add_argument('--seed', help="Seed for the randomness of data generation.")
+    parser.add_argument('--load_data', help="Load data (1) or generate data (0).")
     parser.add_argument('--A_and_task_dir', help="Path for the underlying tensor A and Y0, Z0.")
 
     # Parse args (otherwise set defaults)
@@ -74,48 +75,64 @@ if __name__ == "__main__":
     if args.A_and_task_dir:
         A_and_task_dir = args.A_and_task_dir
     else:
-        A_and_task_dir = "meta_test_results/persistent/"
+        A_and_task_dir = "./meta_test_results/persistent/"
     if args.seed:
         seed = args.seed
     else:
         seed = 42
+    if args.load_data:
+        load_data = int(args.load_data)
+    else:
+        load_data = 1
 
-    A = pickle.load(open(A_and_task_dir + "A.pkl", "rb"))
-    X = pickle.load(open(A_and_task_dir + "X.pkl", "rb"))
-    Y = pickle.load(open(A_and_task_dir + "Y.pkl", "rb"))
-    Z = pickle.load(open(A_and_task_dir + "Z.pkl", "rb"))
-    R = pickle.load(open(A_and_task_dir + "R.pkl", "rb"))
-    task_function = pickle.load(open(A_and_task_dir + "task_function.pkl", "rb"))
     #N,_ = X.shape
     #_,d3 = Z.shape
     #Ri = [R[i][task_function[i]] for i in range(N)]
     #est_A2 = algo2(Ri, X, Y, task_function, r, d3, A)
     #print(tl.norm(est_A2-A)/tl.norm(A))
+    if load_data:
+        A = pickle.load(open(A_and_task_dir + "A.pkl", "rb"))
+        X = pickle.load(open(A_and_task_dir + "X.pkl", "rb"))
+        Y = pickle.load(open(A_and_task_dir + "Y.pkl", "rb"))
+        Z = pickle.load(open(A_and_task_dir + "Z.pkl", "rb"))
+        R = pickle.load(open(A_and_task_dir + "R.pkl", "rb"))
+        task_function = pickle.load(open(A_and_task_dir + "task_function.pkl", "rb"))
+    else:
+     # Generate A tensor
+        A = generate_A_tensor(d1, d2, d3, r)
+        # Generate synthetic training data
+        X, Y, Z = generate_training_data(d1, d2, d3, N, T)
+        noise = np.random.normal(0, 1, (N, T))
+        R = generate_responses(A, X, Y, Z, T)
+        #print("R shape = {}".format(R.shape))
+        R += noise
+        task_function = np.random.randint(0, T, size=N)
+        #save generated data
+        pickle.dump(A, open(A_and_task_dir + "A.pkl", "wb"))
+        pickle.dump(X, open(A_and_task_dir + "X.pkl", "wb"))
+        pickle.dump(Y, open(A_and_task_dir + "Y.pkl", "wb"))
+        pickle.dump(Z, open(A_and_task_dir + "Z.pkl", "wb"))
+        pickle.dump(R, open(A_and_task_dir + "R.pkl", "wb"))
+        pickle.dump(task_function, open(A_and_task_dir + "task_function.pkl", "wb"))
 
-    #save est_A2
-    #pickle.dump(est_A2, open(A_and_task_dir + "est_A2.pkl", "wb"))
-    # Generate A tensor
-    #A = generate_A_tensor(d1, d2, d3, r)
-    # Generate synthetic training data
-    #X, Y, Z = generate_training_data(d1, d2, d3, N, T)
-    #noise = np.random.normal(0, 1, (N, T))
-    #R = generate_responses(A, X, Y, Z, T)
-    #print("R shape = {}".format(R.shape))
-    #R += noise
-    #task_function = np.random.randint(0, T, size=N)
+    exit()
+
     true_B = mode_dot(A, Z, mode=2)
     Y_ti = Y[task_function]
     cov_X = np.einsum('bi,bo->bio', X, Y_ti)
 
     # Perform algorithm 1 to get estimated A
     eps = 0.01
-    B, est_A = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+    B, A1, A2 = algo1(true_B, A, R, X, Y, Z, cov_X, T, eta, eps, r, lambd, task_function, iterations)
 
-    # Save A, est_A, X, Y, Z, task_function, and R
-    #pickle.dump(A, open(A_and_task_dir + "A.pkl", "wb"))
-    pickle.dump(est_A, open(A_and_task_dir + "est_A.pkl", "wb"))
-    #pickle.dump(X, open(A_and_task_dir + "X.pkl", "wb"))
-    #pickle.dump(Y, open(A_and_task_dir + "Y.pkl", "wb"))
-    #pickle.dump(Z, open(A_and_task_dir + "Z.pkl", "wb"))
-    #pickle.dump(R, open(A_and_task_dir + "R.pkl", "wb"))
-    #pickle.dump(task_function, open(A_and_task_dir + "task_function.pkl", "wb"))
+
+    #N,_ = X.shape
+    #_,d3 = Z.shape
+    #Ri = [R[i][task_function[i]] for i in range(N)]
+    #A1, A2 = algo2(Ri, X, Y, task_function, r, d3, A)
+    #save est_A2
+    pickle.dump(A1, open(A_and_task_dir + "est_A1.pkl", "wb"))
+    pickle.dump(A2, open(A_and_task_dir + "est_A2.pkl", "wb"))
+
+       # Save A, est_A, X, Y, Z, task_function, and R
+

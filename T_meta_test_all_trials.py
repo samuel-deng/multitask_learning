@@ -6,30 +6,30 @@ from tensorly.tenalg import multi_mode_dot
 from tensorly.tenalg import mode_dot
 from tensorly.tenalg import khatri_rao
 from algo1 import algo1
+from algo2 import algo2
 from generate_data import generate_training_data
 from generate_data import generate_responses
 from generate_data import generate_A_tensor
 
-def least_squares(A, X, Y0, R, r):
+def least_squares(A1, A2, X, Y0, R, r):
     # Get the CP decomposition of A
-    W, factors = parafac(A, r, normalize_factors=True)
+    #W, factors = parafac(A, r, normalize_factors=True)
     #print(W)
-    A1 = factors[0]
-    A2 = factors[1]
-    A3 = factors[2]
+    #A1 = factors[0]
+    #A2 = factors[1]
+    #A3 = factors[2]
 
     # Construct \hat{V}
     Y_prod = Y0.T @ A2
     Y_prod = np.reshape(Y_prod, (Y_prod.shape[0], 1)).T
     X_prod = X @ A1
     kr_prod = khatri_rao([Y_prod, X_prod])
-    V = kr_prod @ np.diag(W)
+    #V = kr_prod @ np.diag(W)
 
-    # Construct hat_{Z}
-    inverse_term = (A3 @ V.T) @ (V @ A3.T)
-    Z = np.linalg.pinv((V @ A3.T)) @ R
+    #inverse_term = (A3 @ V.T) @ (V @ A3.T)
+    wt = np.linalg.pinv(kr_prod) @ R
     # Z = np.linalg.pinv(inverse_term) @ (A3 @ V.T @ R)
-    return Z
+    return wt
 
 def generate_test_data(A, Y, Z, N2):
     d2, T = Y.shape
@@ -88,10 +88,20 @@ if __name__ == '__main__':
     parser.add_argument("--lambd", help="Value of hyperparameter lambda.")
     parser.add_argument('--eta', help="Eta (learning rate) parameter.")
     parser.add_argument('--trial', help="current trial.")
+    parser.add_argument('--load_data', help="Load / Generate Data (default is load (1)).")
+    parser.add_argument('--method', help="algo1 (1) or algo2 (2)")
 
 
     # Parse args (otherwise set defaults)
     args = parser.parse_args()
+    if args.method:
+        method = int(args.method)
+    else:
+        method = 1
+    if args.load_data:
+        load_data = int(args.load_data)
+    else:
+        load_data = 1
     if args.sigma:
         sigma = float(args.sigma)
     else:
@@ -145,42 +155,62 @@ if __name__ == '__main__':
     Y = pickle.load(open(A_and_task_dir + 'Y.pkl', 'rb'))
     Z = pickle.load(open(A_and_task_dir + 'Z.pkl', 'rb'))
 
-    #generate test data (N2=50 samples)
-    X2, Y2, Z2, R2 = generate_test_data(A, Y, Z, 50)
-    #load meta test data
-    #X2 = pickle.load(open(output_dir + 'X2_test.pkl', 'rb'))
-    #Y2 = pickle.load(open(output_dir + 'Y2_test.pkl', 'rb'))
-    #Z2 = pickle.load(open(output_dir + 'Z2_test.pkl', 'rb'))
-    #R2 = pickle.load(open(output_dir + 'R2_test.pkl', 'rb'))
+    if load_data == 0:
+        #generate test data (N2=50 samples)
+        X2, Y2, Z2, R2 = generate_test_data(A, Y, Z, 50)
+        pickle.dump(X2, open(output_dir + 'X2_test.pkl', 'wb'))
+        pickle.dump(Y2, open(output_dir + 'Y2_test.pkl', 'wb'))
+        pickle.dump(Z2, open(output_dir + 'Z2_test.pkl', 'wb'))
+        pickle.dump(R2, open(output_dir + 'R2_test.pkl', 'wb'))
+    else:
+        #load meta test data
+        X2 = pickle.load(open(output_dir + 'X2_test.pkl', 'rb'))
+        Y2 = pickle.load(open(output_dir + 'Y2_test.pkl', 'rb'))
+        Z2 = pickle.load(open(output_dir + 'Z2_test.pkl', 'rb'))
+        R2 = pickle.load(open(output_dir + 'R2_test.pkl', 'rb'))
 
     mse_all = np.zeros(10)
 
-    for T in range(20,220,20):
+    for T in range(40,440,40):
         #generate data
-        X1, Y1, Z1, R1, task_function = generate_new_data(A, Y, Z, T)
-        #save data
-        pickle.dump(X1, open(output_dir + 'X1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
-        pickle.dump(Y1, open(output_dir + 'Y1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
-        pickle.dump(Z1, open(output_dir + 'Z1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
-        pickle.dump(R1, open(output_dir + 'R1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
-        pickle.dump(task_function, open(output_dir + 'task_function_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
+        if load_data == 0:
+            X1, Y1, Z1, R1, task_function = generate_new_data(A, Y, Z, T)
+            #save data
+            pickle.dump(X1, open(output_dir + 'X1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
+            pickle.dump(Y1, open(output_dir + 'Y1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
+            pickle.dump(Z1, open(output_dir + 'Z1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
+            pickle.dump(R1, open(output_dir + 'R1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
+            pickle.dump(task_function, open(output_dir + 'task_function_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'wb'))
 
-        print('done ' + str(trial) +' ' + str(T))
-        #load data
-        X1 = pickle.load(open(output_dir + 'X1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
-        Y1 = pickle.load(open(output_dir + 'Y1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
-        Z1 = pickle.load(open(output_dir + 'Z1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
-        R1 = pickle.load(open(output_dir + 'R1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
-        task_function = pickle.load(open(output_dir + 'task_function_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+            print('done ' + str(trial) +' ' + str(T))
+        else:
+            #load data
+            X1 = pickle.load(open(output_dir + 'X1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+            Y1 = pickle.load(open(output_dir + 'Y1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+            Z1 = pickle.load(open(output_dir + 'Z1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+            R1 = pickle.load(open(output_dir + 'R1_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+            task_function = pickle.load(open(output_dir + 'task_function_T_{TF}_trial_{trialF}.pkl'.format(TF=T,trialF=trial),'rb'))
+
         #estimate tensor A
         true_B = mode_dot(A, Z1, mode=2)
         #Perform algorithm 1 to get estimated A
         Y_ti = Y[task_function]
-        cov_X = np.einsum('bi,bo->bio', X1, Y_ti)
-        eps = 0.01
-        B, est_A = algo1(true_B, A, R1, X1, Y1, Z1, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+        if method == 1:
+            cov_X = np.einsum('bi,bo->bio', X1, Y_ti)
+            eps = 0.01
+            B, est_A1, est_A2 = algo1(true_B, A, R1, X1, Y1, Z1, cov_X, T, eta, eps, r, lambd, task_function, iterations)
+            #save A1 and A2
+        else:
+            N,_ = X1.shape
+            _,d3 = Z1.shape
+            #Ri = [R1[i][task_function[i]] for i in range(N)]
+            est_A1, est_A2 = algo2(R1, X1, Y1, task_function, 10, d3, A)
 
-        est_Z2 = least_squares(est_A, X2, Y2, R2, r)
+        pickle.dump(est_A1, open(output_dir + 'est_A1_trial_{trialF}_T_{TF}_method_{methodF}.pkl'.format(trialF=trial, TF=T, methodF=method), 'wb'))
+        pickle.dump(est_A2, open(output_dir + 'est_A2_trial_{trialF}_T_{TF}_method_{methodF}.pkl'.format(trialF=trial, TF=T, methodF=method), 'wb'))
+
+        # Need to get A^3^TZ_0 from A to perform least squares on new task
+        est_wt = least_squares(est_A1, est_A2,  X2, Y2, R2, 10)
 
         # Now, generate 500 test instances to compare MSE (done in notebook when plotting)
         # Generate user feature vectors X
@@ -189,14 +219,18 @@ if __name__ == '__main__':
         X_test = user_sigma * np.random.randn(500, d1) + user_mu # From N(0, 1/sqrt(d1))
 
         # Find avg. error over all X
+        Y_prod = Y2.T @ est_A2
+        Y_prod = np.reshape(Y_prod, (Y_prod.shape[0], 1)).T
+        X_prod = np.matmul(X_test, est_A1)
+        kr_prod = khatri_rao([Y_prod, X_prod])
+        est_R = kr_prod @ est_wt
         true_R = multi_mode_dot(mode_dot(A, X_test, mode=0), [Y2, Z2], modes=[1,2])
-        est_R = multi_mode_dot(mode_dot(est_A, X_test, mode=0), [Y2, est_Z2], modes=[1,2])
         MSE = np.sum(np.square(true_R - est_R))
         MSE = MSE / X_test.shape[0]
-        mse_all[(T-20)//20] = MSE
+        mse_all[(T-40)//40] = MSE
         print(MSE)
     print(mse_all)
-    pickle.dump(mse_all, open(output_dir + 'mse_trial_{trialF}.pkl'.format(trialF=trial),'wb'))
+    pickle.dump(mse_all, open(output_dir + 'mse_trial_{trialF}_method_{methodF}.pkl'.format(trialF=trial,methodF=method),'wb'))
     #print(np.mean(mse_all, axis=0))
     #print(np.std(mse_all, axis=0)/num_trials)
 

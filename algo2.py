@@ -6,6 +6,7 @@ from tensorly.cp_tensor import cp_to_tensor
 from tensorly import kr
 from tensorly.decomposition import parafac
 import tensorly as tl
+import math
 
 def algo2(R, X, Y, task_function, r, d3, A):
 
@@ -29,23 +30,31 @@ def algo2(R, X, Y, task_function, r, d3, A):
     A2 = B[:, :r]
 
     #use estimates A1 and A2 to get an estimate of A3
-    M = np.zeros((d3, d3))
-    print(A2.shape)
-    print(A1.shape)
+    M = np.zeros((r, r))
+    #print(A2.shape)
+    #print(A1.shape)
     krprod = kr((A2, A1))
     for i in range(N):
         P = np.kron(Y[task_function[i]], X[i]) @ krprod
         M += R[i]*R[i] * (P @ P.T)
+    #print(M.shape)
     B, D, B1 = svd(M, full_matrices=False)
-    A3 = B[:, :r]
-    W = np.sqrt(D[:r])*np.sqrt(d3)
-    print(D[:r])
+    C3 = B[:, :r]
+    C3 = np.concatenate((C3, np.zeros((r, d3-r))), axis=1)
+    A3 = C3.T
+    #print(A3.shape)
+    weights = np.ones(r)
 
-    est_A = cp_to_tensor((W, [A1, A2, A3]))
-    print(est_A.shape)
+
+    est_A = cp_to_tensor((weights, [A1, A2, A3]))
+    #print(est_A.shape)
     weights, factors = parafac(A,r)
-    print(tl.norm(factors[0]-A1)/ tl.norm(A1))
-    print(tl.norm(factors[1]-A2)/ tl.norm(A2))
-    print(tl.norm(factors[2]-A3)/ tl.norm(A3))
-    return est_A
+    #theta1 = math.acos(np.linalg.norm(factors[0].T @ A1, ord=2))
+    print(np.linalg.norm(factors[0].T @ A1, ord=2))
+    print(np.linalg.norm(factors[1].T @ A2, ord=2))
+    #print(math.sin(theta1))
+    #theta2 = math.acos(np.linalg.norm(factors[1].T @ A2, ord=2))
+    #print(math.sin(theta2))
+    #print(tl.norm(factors[2]-A3)/ tl.norm(A3))
+    return A1, A2
 
