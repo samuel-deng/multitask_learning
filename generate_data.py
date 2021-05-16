@@ -40,7 +40,8 @@ def generate_A_tensor(d1, d2, d3, r ):
 
     # Generate underlying tensor (A), rank r
     (_, factors) = random_cp((d1, d2, d3), full=False, rank=r, orthogonal=True, normalise_factors=True)
-    weights = np.random.uniform(low=1.0, high=10.0, size=(r))
+    #weights = np.random.uniform(low=1.0, high=10.0, size=(r))
+    weights = np.ones(r)
     A = cp_to_tensor((weights, factors))
     return A
 

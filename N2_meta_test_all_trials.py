@@ -11,26 +11,25 @@ from generate_data import generate_training_data
 from generate_data import generate_responses
 from generate_data import generate_A_tensor
 
-def least_squares(A, X, Y0, R, r):
+def least_squares(A1, A2, X, Y0, R, r):
     # Get the CP decomposition of A
-    W, factors = parafac(A, r, normalize_factors=True)
+    #W, factors = parafac(A, r, normalize_factors=True)
     #print(W)
-    A1 = factors[0]
-    A2 = factors[1]
-    A3 = factors[2]
+    #A1 = factors[0]
+    #A2 = factors[1]
+    #A3 = factors[2]
 
     # Construct \hat{V}
     Y_prod = Y0.T @ A2
     Y_prod = np.reshape(Y_prod, (Y_prod.shape[0], 1)).T
     X_prod = X @ A1
     kr_prod = khatri_rao([Y_prod, X_prod])
-    V = kr_prod @ np.diag(W)
+    #V = kr_prod @ np.diag(W)
 
-    # Construct hat_{Z}
-    inverse_term = (A3 @ V.T) @ (V @ A3.T)
-    Z = np.linalg.pinv((V @ A3.T)) @ R
+    #inverse_term = (A3 @ V.T) @ (V @ A3.T)
+    wt = np.linalg.pinv(kr_prod) @ R
     # Z = np.linalg.pinv(inverse_term) @ (A3 @ V.T @ R)
-    return Z
+    return wt
 
 def generate_new_task(d1, d2, d3, N2, A, seed=42):
     # Seed the randomness
@@ -89,7 +88,9 @@ if __name__ == '__main__':
 
     # Load A and est_A from saved directory
     A = pickle.load(open(A_and_task_dir + "A.pkl", "rb"))
-    est_A = pickle.load(open(A_and_task_dir + "est_A.pkl", "rb"))
+    weights, factors = parafac(A, 10)
+    est_A1 = pickle.load(open(A_and_task_dir + "est_A1.pkl", "rb"))
+    est_A2 = pickle.load(open(A_and_task_dir + "est_A2.pkl", "rb"))
     d1, d2, d3 = A.shape
 
     mse_all = np.zeros((num_trials,10))
@@ -110,8 +111,9 @@ if __name__ == '__main__':
             Z0 = pickle.load(open(output_dir + 'Z0_N2_{N2F}_trial_{trialF}.pkl'.format(N2F=N2,trialF=trial),'rb'))
             R = pickle.load(open(output_dir + 'R_N2_{N2F}_trial_{trialF}.pkl'.format(N2F=N2,trialF=trial),'rb'))
 
-            # Need to get W from A to perform least squares on new task
-            est_Z0 = least_squares(est_A, X2, Y0, R, 10)
+            # Need to get A^3^TZ_0 from A to perform least squares on new task
+            est_wt = least_squares(est_A1, est_A2,  X2, Y0, R, 10)
+            #print(np.sum(np.square(est_wt - np.matmul(factors[2].T , Z0))))
 
             # Now, generate 500 test instances to compare MSE (done in notebook when plotting)
             # Generate user feature vectors X
@@ -120,8 +122,12 @@ if __name__ == '__main__':
             X_test = user_sigma * np.random.randn(500, d1) + user_mu # From N(0, 1/sqrt(d1))
 
             # Find avg. error over all X
+            Y_prod = Y0.T @ est_A2
+            Y_prod = np.reshape(Y_prod, (Y_prod.shape[0], 1)).T
+            X_prod = np.matmul(X_test, est_A1)
+            kr_prod = khatri_rao([Y_prod, X_prod])
+            est_R = kr_prod @ est_wt
             true_R = multi_mode_dot(mode_dot(A, X_test, mode=0), [Y0, Z0], modes=[1,2])
-            est_R = multi_mode_dot(mode_dot(est_A, X_test, mode=0), [Y0, est_Z0], modes=[1,2])
             MSE = np.sum(np.square(true_R - est_R))
             MSE = MSE / X_test.shape[0]
             mse_all[trial][(N2-20)//20] = MSE
